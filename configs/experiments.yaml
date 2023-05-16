@@ -1,0 +1,81 @@
+##------------------Experiment config------------------##
+weathers: [
+    # 'ClearNoon',
+    'SoftRainNoon',
+    # 'HardRainNoon',
+    'ClearSunset',
+  ]
+# 'SoftRainSunset',
+# 'HardRainSunset',
+towns: ['Town01']
+navigation_types: ['navigation'] # 'straight',, 'navigation', 'one_curve'
+background_activity:
+  n_vehicles: 20
+  n_walkers: 0
+  tm_hybrid_mode: True
+  seed: 1337
+repeat: 1
+
+others:
+  max_time_idle: 500
+  max_time_episode: 6400
+
+##-----------------------------------------------------#
+# Other parameters
+image_size: [1, 256, 256]
+image_resize: [1, 256, 256]
+crop: False
+crop_image_resize: [1, 64, 128]
+alpha: 0.75
+beta: 0.1
+seq_length: 3
+normalize_kalman: True
+clip_kalman: True
+max_position: 400
+max_velocity: 1
+
+##------------------Vehicle config------------------##
+vehicle:
+  target_speed: 20 # Km/hr
+  ignore_traffic_lights: False
+  agent: 'Behavior'
+  behavior: ['cautious'] #  'cautious', 'aggressive'
+  blueprint: 'vehicle.lincoln.mkz2017'
+  sensors:
+    collision:
+      type: 'sensor.other.collision'
+    imu:
+      type: 'sensor.other.imu'
+    gnss:
+      type: 'sensor.other.gnss'
+    obstacle:
+      type: 'sensor.other.obstacle'
+      distance: 5
+      hit_radius: 0.5
+      only_dynamics: True
+    semseg:
+      type: 'sensor.camera.semantic_segmentation'
+      image_size_x: 256
+      image_size_y: 256
+      transform: '1.25,0,1.85,-90,0,0'
+    rgb:
+      type: 'sensor.camera.rgb'
+      image_size_x: 256
+      image_size_y: 256
+      transform: '1.25,0,1.85,-90,0,0'
+  sensors_process:
+    normalized: True
+    gray_scale: True
+  spawn_points: []
+  path_points: [[220, 216]]
+
+##------------------Summary writer config------------------##
+summary_writer:
+  write_path: null
+  directory: null
+  file_name: null
+
+##------------------Simulation config------------------##
+simulation:
+  seed: 1337
+  sync: True
