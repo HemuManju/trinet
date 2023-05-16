@@ -615,11 +615,6 @@ class AutoRegressorBranchNet(pl.LightningModule):
             [AutoRegressor(hparams, self.layer_size) for i in range(4)]
         )
 
-        # Four branches for speed prediction
-        self.speed_branch = nn.ModuleList(
-            [MLP(self.layer_size, 1, dropout=0.0) for i in range(4)]
-        )
-
     def forward(self, x, command):
         waypoints = torch.cat(
             [
@@ -629,12 +624,13 @@ class AutoRegressorBranchNet(pl.LightningModule):
         )
 
         # Speed prediction
-        speed = torch.cat(
-            [
-                self.speed_branch[i - 1](x_in)
-                for x_in, i in zip(x, command.to(torch.int))
-            ]
-        )
+        # speed = torch.cat(
+        #     [
+        #         self.speed_branch[i - 1](x_in)
+        #         for x_in, i in zip(x, command.to(torch.int))
+        #     ]
+        # )
+        speed = 0
         return waypoints, speed
 
 
