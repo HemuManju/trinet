@@ -22,13 +22,13 @@ def consolidate_results(df):
     results['n_collisions'] = sum(((df['n_collisions'] > 0) * 1).diff().dropna() > 0)
     # results['n_collisions'] = df['n_collisions'].values[-1]
 
-    if (not_stopped_percent < 75.0) and not results['successfull']:
+    if (not_stopped_percent < 85.0) and not results['successfull']:
         results['not_stalled'] = False
     else:
         results['not_stalled'] = True
 
     # Lane invasions
-    results['n_lane_invasion'] = sum(df['lane_invasion'].diff().dropna() > 0)
+    results['n_lane_invasion'] = sum(df['lane_invasion'].diff().dropna() >= 1)
 
     # Percentage completed
     results['route_completed'] = (
@@ -38,7 +38,6 @@ def consolidate_results(df):
     )
 
     # Distance travelled
-
     squared_sum = df['pos_x'].diff().dropna() ** 2 + df['pos_y'].diff().dropna() ** 2
     results['distance_travelled'] = np.sqrt(
         np.array(squared_sum, dtype=np.float64)
@@ -47,7 +46,6 @@ def consolidate_results(df):
     infractions = (
         +results['n_vehicle_collisions']
         + results['n_predistrain_collision']
-        # + results['n_other_collisions']
         + results['n_lane_invasion']
     )
     results['infractions'] = infractions * (1000 / results['distance_travelled'])
@@ -67,8 +65,10 @@ def summarize(read_path):
         df_temp = df.loc[index]
         results.append(consolidate_results(df_temp))
 
-    final_summary = pd.DataFrame.from_dict(results, orient='columns').sort_values(
-        'route_completed', ascending=False
+    final_summary = (
+        pd.DataFrame.from_dict(results, orient='columns')
+        .sort_values('route_completed', ascending=False)
+        .head(15)
     )
     print(final_summary)
 

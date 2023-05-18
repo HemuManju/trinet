@@ -1,8 +1,8 @@
 ##-----------------------------------------------------#
 # Training parameters
 NUM_EPOCHS: 100
-BATCH_SIZE: 64
-LEARNING_RATE: 0.001
+BATCH_SIZE: 128
+LEARNING_RATE: 0.0005
 DROP_OUT: 0.10
 TEST_SIZE: 0.15
 VALID_SIZE: 0.15
@@ -14,7 +14,11 @@ predict_length: 0
 n_actions: 3
 n_classes: 23
 frame_skip: 4
-number_workers: 4
+number_workers: 8
+
+##-----------------------------------------------------#
+# Base Policy parameters
+obs_size: 1
 
 ##-----------------------------------------------------#
 # CARNet Parameters
@@ -37,6 +41,10 @@ alpha: 0.75
 beta: 0.1
 action_processing_id: 6 # 1, 2, 3, 4, 5, 6
 use_scheduler: True
+normalize_kalman: True
+clip_kalman: True
+max_position: 400
+max_velocity: 20
 
 ##-----------------------------------------------------#
 # Data splitting scheme
@@ -66,6 +74,7 @@ data_split:
 
 ##-----------------------------------------------------#
 # Path(s)
+slurm: True
 # raw_data_path: '/home/hemanth/Desktop/carla_data/Town01_NAVIGATION/'
 raw_data_path: '../carla_data/Town01_NAVIGATION/'
 # raw_data_path: '/Users/hemanth/Desktop/carla_data/'

@@ -367,7 +367,11 @@ class PIDKalmanAgent(PIDCILAgent):
 
         # Get the control
         output = self._control_function(images.unsqueeze(0), command, kalman)
-        waypoints, speed = output[0][0].cpu().numpy(), output[1][0].cpu().numpy()
+        try:
+            waypoints, speed = output[0][0].cpu().numpy(), output[1].cpu().numpy()
+        except AttributeError:
+            waypoints = output[0][0].cpu().numpy()
+
         world_frame_waypoints = project_to_world_frame(np.array(waypoints), observation)
 
         if self.current_waypoint is None:

@@ -235,9 +235,9 @@ with skip_run('skip', 'imitation_with_kalman_carnet') as check, check():
     )
     trainer.fit(model)
 
-with skip_run('run', 'imitation_with_kanet_base_policy') as check, check():
+with skip_run('skip', 'imitation_with_kanet_base_policy_conv') as check, check():
     # Load the configuration
-    cfg = yaml.load(open('configs/carnet.yaml'), Loader=yaml.SafeLoader)
+    cfg = yaml.load(open('configs/imitation.yaml'), Loader=yaml.SafeLoader)
     cfg['logs_path'] = cfg['logs_path'] + str(date.today()) + '/IMITATION_KALMAN'
 
     # Random seed
@@ -276,9 +276,9 @@ with skip_run('run', 'imitation_with_kanet_base_policy') as check, check():
     cfg['ekf'] = ExtendedKalmanFilter(cfg)
 
     # Base Policy
-    read_path = 'logs/2022-10-15/IMITATION/last.ckpt'
+    # read_path = 'logs/2022-10-15/IMITATION/last.ckpt'
     base_policy = CIRLWaypointPolicy(cfg)
-    base_policy = load_checkpoint(base_policy, checkpoint_path=read_path, strict=False)
+    # base_policy = load_checkpoint(base_policy, checkpoint_path=read_path, strict=False)
     cfg['base_policy'] = base_policy
 
     # Over all network
@@ -342,31 +342,22 @@ with skip_run('skip', 'benchmark_trained_karnet_base') as check, check():
         config['summary_writer']['directory'] = f'{town}_{navigation_type}_{weather}'
 
         # Update the model
-        restore_config = {
-            'checkpoint_path': f'logs/2023-04-21/IMITATION_KALMAN/imitation_{navigation_type}.ckpt'
-        }
 
-        read_path = 'logs/2023-01-03/CARNET_KALMAN/last.ckpt'
         cnn_autoencoder = CNNAutoEncoder(cfg)
         carnet = CARNetExtended(cfg, cnn_autoencoder)
-        carnet = load_checkpoint(carnet, checkpoint_path=read_path)
         cfg['carnet'] = carnet
 
         # Action net
         action_net = AutoRegressorBranchNet(dropout=0, hparams=cfg)
-        # read_path = 'logs/action_net.pt'
-        # action_net = load_checkpoint(
-        #     action_net, checkpoint_path=read_path, only_weights=True, strict=False
-        # )
         cfg['action_net'] = action_net
 
         # Base Policy
-        read_path = 'logs/2022-10-15/IMITATION/last.ckpt'
         base_policy = CIRLWaypointPolicy(cfg)
-        base_policy = load_checkpoint(
-            base_policy, checkpoint_path=read_path, strict=False
-        )
         cfg['base_policy'] = base_policy
+
+        restore_config = {
+            'checkpoint_path': f'logs/2023-05-17/IMITATION_KALMAN/last.ckpt'
+        }
 
         model = Imitation.load_from_checkpoint(
             restore_config['checkpoint_path'],
@@ -374,7 +365,6 @@ with skip_run('skip', 'benchmark_trained_karnet_base') as check, check():
             net=CIRLBasePolicyKARNet(cfg),
             data_loader=None,
         )
-
         agent = PIDKalmanAgent(model=model, config=cfg)
 
         # Setup the benchmark
@@ -442,7 +432,7 @@ with skip_run('skip', 'benchmark_trained_carnet_model') as check, check():
     # Kill all servers
     kill_all_servers()
 
-with skip_run('skip', 'summarize_benchmark') as check, check():
+with skip_run('run', 'summarize_benchmark') as check, check():
     # Load the configuration
     cfg = yaml.load(open('configs/imitation.yaml'), Loader=yaml.SafeLoader)
     cfg['logs_path'] = cfg['logs_path'] + str(date.today()) + '/WARMSTART'
@@ -458,7 +448,7 @@ with skip_run('skip', 'summarize_benchmark') as check, check():
     for town, weather, navigation_type in itertools.product(
         towns, weathers, navigation_types
     ):
-        path = f'logs/benchmark_results/{town}_{navigation_type}_{weather}/measurements.csv'
+        path = f'logs/benchmark_results/{town}_{navigation_type}_{weather}_3/measurements.csv'
         print('-' * 32)
         print(town, weather, navigation_type)
         summarize(path)

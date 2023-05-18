@@ -1,6 +1,7 @@
 import os
 import csv
 import gc
+import yaml
 
 import pandas as pd
 
@@ -182,6 +183,12 @@ class Benchmarking:
         try:
             # Setup the data_writer
             self.data_recorder = DataRecorder(experiment_config['summary_writer'])
+
+            # Save the config files
+            folder_path = self.data_recorder.write_path
+            with open(folder_path + '/experiment_config.yaml', 'w') as file:
+                yaml.dump(experiment_config, file)
+            file.close()
 
             # Run the simulations
             for i in range(len(experiment_config['vehicle']['path_points'])):

@@ -53,6 +53,8 @@ vehicle:
       distance: 5
       hit_radius: 0.5
       only_dynamics: True
+    lane_invasion:
+      type: 'sensor.other.lane_invasion'
     semseg:
       type: 'sensor.camera.semantic_segmentation'
       image_size_x: 256

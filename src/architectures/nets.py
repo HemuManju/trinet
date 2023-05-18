@@ -445,7 +445,7 @@ class BaseResNet(pl.LightningModule):
         super(BaseResNet, self).__init__()
 
         # Architecture
-        self.resnet = SimpleResNet(output_size=512)
+        self.resnet = SimpleResNet(output_size=128)
 
     def forward(self, x):
         x = self.resnet(x)
@@ -756,11 +756,15 @@ class CIRLBasePolicyKARNet(pl.LightningModule):
 
         self.action_net = self.cfg['action_net']
 
+        self.combine_conv = nn.Sequential(
+            nn.Conv1d(3, 1, kernel_size=3, stride=1), nn.ReLU()
+        )
+
         # Future latent vector prediction
         self.carnet = self.set_parameter_requires_grad(self.cfg['carnet'])
         # self.base_policy = self.cfg['base_policy']
         self.back_bone_net = BaseResNet(obs_size)
-        self.transition_layer = nn.LazyLinear(512)
+        self.transition_layer = nn.LazyLinear(126)
 
     def set_parameter_requires_grad(self, model):
         for param in model.parameters():
@@ -780,9 +784,10 @@ class CIRLBasePolicyKARNet(pl.LightningModule):
         # self.base_policy.eval()
         base_x = self.back_bone_net(x[:, -1, :, :, :])
 
-        combined_embeddings = torch.hstack(
-            (embeddings[:, -1, :], out[:, -1, :], base_x)
+        combined_embeddings = torch.stack(
+            (embeddings[:, -1, :], out[:, -1, :], base_x), dim=1
         )
+        combined_embeddings = self.combine_conv(combined_embeddings).squeeze(1)
 
         # Transition layer
         out = self.transition_layer(combined_embeddings)
