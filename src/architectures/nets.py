@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from src.visualization.visualize import interactive_show_grid
 
 from .resnet import SimpleResNet, ResNetDec, ResNetEnc, ResNet
-
+from .attention import WeightedSelfAttention
 from .layer_config import (
     layers_encoder_256_128,
     layers_decoder_256_128,
@@ -756,8 +756,8 @@ class CIRLBasePolicyKARNet(pl.LightningModule):
 
         self.action_net = self.cfg['action_net']
 
-        self.combine_conv = nn.Sequential(
-            nn.Conv1d(3, 1, kernel_size=3, stride=1), nn.ReLU()
+        self.combine_attn = nn.Sequential(
+            WeightedSelfAttention(input_dim=128), nn.ReLU()
         )
 
         # Future latent vector prediction
@@ -787,7 +787,8 @@ class CIRLBasePolicyKARNet(pl.LightningModule):
         combined_embeddings = torch.stack(
             (embeddings[:, -1, :], out[:, -1, :], base_x), dim=1
         )
-        combined_embeddings = self.combine_conv(combined_embeddings).squeeze(1)
+        combined_embeddings = self.combine_attn(combined_embeddings)
+        combined_embeddings = torch.sum(combined_embeddings, dim=1)
 
         # Transition layer
         out = self.transition_layer(combined_embeddings)

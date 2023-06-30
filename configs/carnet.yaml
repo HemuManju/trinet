@@ -74,9 +74,9 @@ data_split:
 
 ##-----------------------------------------------------#
 # Path(s)
-slurm: True
-# raw_data_path: '/home/hemanth/Desktop/carla_data/Town01_NAVIGATION/'
-raw_data_path: '../carla_data/Town01_NAVIGATION/'
+slurm: False
+raw_data_path: '/home/hemanth/Desktop/carla-data/Town01_NAVIGATION/'
+# raw_data_path: '../carla-data/Town01_NAVIGATION/'
 # raw_data_path: '/Users/hemanth/Desktop/carla_data/'
 logs_path: 'logs/'
 train_data_path: 'data/raw/train'
