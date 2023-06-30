@@ -35,6 +35,61 @@ class WeightedSelfAttention(nn.Module):
         return weighted
 
 
+class WeightedSelfAttention(nn.Module):
+    def __init__(self, input_dim):
+        super(WeightedSelfAttention, self).__init__()
+        self.input_dim = input_dim
+        self.query = nn.Linear(input_dim, input_dim)
+        self.key = nn.Linear(input_dim, input_dim)
+        self.value = nn.Linear(input_dim, input_dim)
+        self.softmax = nn.Softmax(dim=2)
+
+    def forward(self, x):
+        queries = x
+        keys = self.key(x)
+        values = self.value(x)
+        scores = torch.bmm(queries, keys.transpose(1, 2)) / (self.input_dim ** 0.5)
+        attention = self.softmax(scores)
+        weighted = torch.bmm(attention, values)
+        return weighted
+
+
+class AdditiveAttention(nn.Module):
+    """
+    Applies a additive attention (bahdanau) mechanism on the output features from the decoder.
+    Additive attention proposed in "Neural Machine Translation by Jointly Learning to Align and Translate" paper.
+
+    Args:
+        hidden_dim (int): dimesion of hidden state vector
+
+    Inputs: query, value
+        - **query** (batch_size, q_len, hidden_dim): tensor containing the output features from the decoder.
+        - **value** (batch_size, v_len, hidden_dim): tensor containing features of the encoded input sequence.
+
+    Returns: context, attn
+        - **context**: tensor containing the context vector from attention mechanism.
+        - **attn**: tensor containing the alignment from the encoder outputs.
+
+    Reference:
+        - **Neural Machine Translation by Jointly Learning to Align and Translate**: https://arxiv.org/abs/1409.0473
+    """
+
+    def __init__(self, hidden_dim: int):
+        super(AdditiveAttention, self).__init__()
+        self.query_proj = nn.Linear(hidden_dim, hidden_dim, bias=False)
+        self.key_proj = nn.Linear(hidden_dim, hidden_dim, bias=False)
+        self.bias = nn.Parameter(torch.rand(hidden_dim).uniform_(-0.1, 0.1))
+        self.score_proj = nn.Linear(hidden_dim, 1)
+
+    def forward(self, x):
+        query = self.query_proj(x)
+        key = self.key_proj(x)
+        score = self.score_proj(torch.tanh(key + query + self.bias)).squeeze(-1)
+        attn = F.softmax(score, dim=-1)
+        context = torch.bmm(attn.unsqueeze(1), value)
+        return context, attn
+
+
 class AttentionConv(nn.Module):
     def __init__(
         self,

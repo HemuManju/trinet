@@ -14,7 +14,7 @@ predict_length: 0
 n_actions: 3
 n_classes: 23
 frame_skip: 4
-number_workers: 8
+number_workers: 0
 
 ##-----------------------------------------------------#
 # Base Policy parameters
@@ -39,7 +39,7 @@ crop_image_resize: [1, 78, 128]
 image_resize: [1, 256, 256]
 alpha: 0.75
 beta: 0.1
-action_processing_id: 6 # 1, 2, 3, 4, 5, 6
+action_processing_id: 7 # 1, 2, 3, 4, 5, 6
 use_scheduler: True
 normalize_kalman: True
 clip_kalman: True

@@ -843,3 +843,48 @@ class CIRLCARNet(pl.LightningModule):
         # Action prediction
         waypoints, speed = self.action_net(out, command)
         return waypoints, speed
+
+
+class AuxNet(pl.LightningModule):
+    """A simple convolution neural network"""
+
+    def __init__(self, model_config):
+        super(AuxNet, self).__init__()
+
+        # Parameters
+        self.cfg = model_config
+        image_size = self.cfg['image_resize']
+        obs_size = self.cfg['obs_size']
+        n_actions = self.cfg['n_actions']
+        dropout = self.cfg['DROP_OUT']
+
+        # Example inputs
+        self.example_input_array = torch.randn(
+            (5, obs_size, image_size[1], image_size[2])
+        )
+        self.example_command = torch.tensor([1, 0, 2, 3, 1])
+        self.layer_size = 64
+
+        self.back_bone_net = BaseResNet(obs_size)
+        self.action_net = AutoRegressorBranchNet(dropout=dropout, hparams=model_config)
+        self.traffic_net = nn.Sequential(
+            nn.LazyLinear(self.layer_size),
+            nn.ReLU(),
+            nn.Linear(self.layer_size, self.layer_size // 2),
+            nn.ReLU(),
+            nn.Linear(self.layer_size // 2, 2),
+        )
+        self.distance_net = nn.Sequential(
+            nn.LazyLinear(self.layer_size),
+            nn.ReLU(),
+            nn.Linear(self.layer_size, self.layer_size // 2),
+            nn.ReLU(),
+            nn.Linear(self.layer_size // 2, 5),
+        )
+
+    def forward(self, x, command):
+        embedding = self.back_bone_net(x)
+        actions = self.action_net(embedding, command)
+        traffic_out = self.traffic_net(embedding)
+        distance_out = self.distance_net(embedding)
+        return actions, traffic_out, distance_out

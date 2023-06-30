@@ -55,6 +55,31 @@ def post_process_action(data, config):
         ego_frame_waypoints = project_to_ego_frame(data)
         points = ego_frame_waypoints[0:n_waypoints, :].astype(np.float32)
         action = (torch.from_numpy(points), torch.tensor(data['speed']))
+
+    elif config['action_processing_id'] == 7:
+        try:
+            dist_to_vehilce = data['dist_to_vehicle']['value']
+        except:
+            dist_to_vehilce = data['dist_to_vehicle']
+        distance_to_vehicle = np.digitize(
+            dist_to_vehilce, bins=[-1.0, 10, 20, 30, 40, 100]
+        )
+
+        if isinstance(distance_to_vehicle, np.int64):
+            distance_to_vehicle = np.asarray(distance_to_vehicle * 1.0)
+
+        traffic = {-1: 0.0, 'red': 1.0}
+        traffic_light = traffic[data['traffic_light_state']]
+
+        n_waypoints = config['n_waypoints']
+        ego_frame_waypoints = project_to_ego_frame(data)
+        points = ego_frame_waypoints[0:n_waypoints, :].astype(np.float32)
+        action = (
+            torch.from_numpy(points),
+            torch.tensor(data['speed']),
+            torch.from_numpy(np.asarray(traffic_light)).long(),
+            torch.from_numpy(distance_to_vehicle).long(),
+        )
     else:
         action = torch.tensor([data['throttle'], data['steer'], data['brake']])
 
@@ -182,6 +207,33 @@ def calculate_theta_near_far(waypoints, location):
     return float(theta_near), float(theta_middle), float(theta_far)
 
 
+def concatenate_aux_samples(samples, config):
+    combined_data = {
+        k: [d.get(k) for d in samples if k in d] for k in set().union(*samples)
+    }
+
+    images = torch.stack(combined_data['jpeg'], dim=0)
+    preproc = get_preprocessing_pipeline(config)
+    images = preproc(images).squeeze(1)
+
+    # Crop the image
+    if config['crop']:
+        crop_size = config['image_resize'][1] - config['crop_image_resize'][1]
+        images = images[:, :, :crop_size, :]
+
+    last_data = samples[-1]['json']
+
+    if last_data['modified_direction'] in [-1, 5, 6]:
+        command = 4
+    else:
+        command = last_data['modified_direction']
+
+    # Post processing according to the ID
+    action = post_process_action(last_data, config)
+
+    return images, command, action
+
+
 def concatenate_samples(samples, config):
     combined_data = {
         k: [d.get(k) for d in samples if k in d] for k in set().union(*samples)
@@ -260,13 +312,16 @@ def webdataset_data_test_iterator(config, file_path):
     return dataset
 
 
-def webdataset_data_iterator(config):
+def webdataset_data_iterator(config, sample_process=None):
     # Get dataset path(s)
     paths = get_dataset_paths(config)
 
+    if sample_process is None:
+        sample_process = concatenate_samples
+
     # Parameters
     BATCH_SIZE = config['BATCH_SIZE']
-    SEQ_LEN = config['seq_length']
+    SEQ_LEN = config['obs_size']
     number_workers = config['number_workers']
 
     # Create train, validation, test datasets and save them in a dictionary
@@ -277,7 +332,7 @@ def webdataset_data_iterator(config):
             dataset = (
                 wds.WebDataset(path, shardshuffle=False)
                 .decode("torchrgb")
-                .then(generate_seqs, concatenate_samples, SEQ_LEN, config)
+                .then(generate_seqs, sample_process, SEQ_LEN, config)
             )
             data_loader = wds.WebLoader(
                 dataset,
