@@ -6,6 +6,7 @@ LEARNING_RATE: 0.001
 DROP_OUT: 0.10
 TEST_SIZE: 0.15
 VALID_SIZE: 0.15
+NORMALIZE_WEIGHT: True
 
 ##-----------------------------------------------------#
 # Data Parameters
@@ -14,7 +15,7 @@ predict_length: 0
 n_actions: 3
 n_classes: 23
 frame_skip: 4
-number_workers: 0
+number_workers: 8
 
 ##-----------------------------------------------------#
 # Base Policy parameters
@@ -74,9 +75,9 @@ data_split:
 
 ##-----------------------------------------------------#
 # Path(s)
-slurm: False
-raw_data_path: '/home/hemanth/Desktop/carla-data/Town01_NAVIGATION/'
-# raw_data_path: '../carla-data/Town01_NAVIGATION/'
+slurm: True
+# raw_data_path: '/home/hemanth/Desktop/carla-data/Town01_NAVIGATION/'
+raw_data_path: '../carla-data/Town01_NAVIGATION/'
 # raw_data_path: '/Users/hemanth/Desktop/carla_data/'
 logs_path: 'logs/'
 train_data_path: 'data/raw/train'

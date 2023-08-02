@@ -6,6 +6,7 @@ LEARNING_RATE: 0.0001
 DROP_OUT: 0.10
 TEST_SIZE: 0.15
 VALID_SIZE: 0.15
+NORMALIZE_WEIGHT: True
 
 ##-----------------------------------------------------#
 # Data Parameters
@@ -14,7 +15,7 @@ predict_length: 0
 n_actions: 3
 n_classes: 23
 frame_skip: 4
-number_workers: 12
+number_workers: 8
 
 ##-----------------------------------------------------#
 # Base Policy parameters

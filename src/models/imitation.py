@@ -109,17 +109,15 @@ class AuxiliaryTraining(pl.LightningModule):
             + criterion_traffic(output[1], action[2])
             + criterion_vehicle_dist(output[2], action[3])
         )
+
         self.accuracy_traffic(output[1].argmax(dim=1), action[2])
         self.accuracy_vehicle_dist(output[2].argmax(dim=1), action[3])
 
         self.log(
-            'train_traffic_accuracy',
-            self.accuracy_traffic,
-            on_step=False,
-            on_epoch=True,
+            'val_traffic_accuracy', self.accuracy_traffic, on_step=False, on_epoch=True,
         )
         self.log(
-            'train_vehicle_dist_accuracy',
+            'val_vehicle_dist_accuracy',
             self.accuracy_vehicle_dist,
             on_step=False,
             on_epoch=True,

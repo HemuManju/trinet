@@ -19,7 +19,13 @@ from .layer_config import (
 
 from .layer_config_modified import layers_decoder_128, layers_encoder_128
 
-from .utils import build_conv_model, build_deconv_model, Flatten, get_model
+from .utils import (
+    build_conv_model,
+    build_deconv_model,
+    Flatten,
+    get_model,
+    ConstrainedConv1d,
+)
 
 
 class ConvNet(pl.LightningModule):
@@ -349,7 +355,6 @@ class CARNet(pl.LightningModule):
         self.after_rnn = nn.LazyLinear(latent_size)
 
     def forward(self, x, k_states=None):
-
         batch_size, timesteps, C, H, W = x.size()
         # Encoder
         embeddings = self.cnn_autoencoder.encode(
@@ -407,8 +412,8 @@ class CARNetExtended(pl.LightningModule):
         self.after_rnn = nn.LazyLinear(latent_size)
 
     def forward(self, x, kalman=None):
-
         batch_size, timesteps, C, H, W = x.size()
+
         # Encoder
         cnn_embeddings = self.cnn_autoencoder.encode(
             x.view(batch_size * timesteps, C, H, W)
@@ -737,11 +742,71 @@ class CARNETRegressorPolicy(pl.LightningModule):
         return actions
 
 
-class CIRLBasePolicyKARNet(pl.LightningModule):
+class CIRLBasePolicyAux(pl.LightningModule):
     """A simple convolution neural network"""
 
     def __init__(self, model_config):
-        super(CIRLBasePolicyKARNet, self).__init__()
+        super(CIRLBasePolicyAux, self).__init__()
+
+        # Parameters
+        self.cfg = model_config
+        image_size = self.cfg['image_resize']
+        obs_size = self.cfg['obs_size']
+        self.time_steps = self.cfg['seq_length'] - 1
+
+        # Example inputs
+        self.example_input_array = torch.randn((5, self.time_steps, *image_size))
+        self.example_command = torch.tensor([1, 0, 2, 3, 1])
+
+        self.action_net = self.cfg['action_net']
+
+        if model_config['NORMALIZE_WEIGHT']:
+            self.combine_conv = nn.Sequential(
+                ConstrainedConv1d(2, 1, kernel_size=2, stride=1), nn.ReLU()
+            )
+        else:
+            self.combine_conv = nn.Sequential(
+                nn.Conv1d(2, 1, kernel_size=2, stride=1), nn.ReLU()
+            )
+
+        # Future latent vector prediction
+        self.auxnet = self.set_parameter_requires_grad(self.cfg['auxnet'])
+
+        self.back_bone_net = BaseResNet(obs_size)
+        self.transition_layer = nn.LazyLinear(126)
+
+    def set_parameter_requires_grad(self, model):
+        for param in model.parameters():
+            param.requires_grad = False
+        return model
+
+    def forward(self, x, command, kalman=None):
+        # This is necessary for KARNet
+        x = x[:, -1, :, :, :]
+
+        # Future latent vector prediction
+        self.auxnet.eval()
+        actions, traffic_out, distance_out, embedding = self.auxnet(x, command)
+
+        # Base Policy
+        base_x = self.back_bone_net(x)
+
+        combined_embeddings = torch.stack((embedding, base_x), dim=1)
+        combined_embeddings = self.combine_conv(combined_embeddings).squeeze(1)
+
+        # Transition layer
+        out = self.transition_layer(combined_embeddings)
+
+        # Action prediction
+        waypoints, speed = self.action_net(out, command)
+        return waypoints, speed
+
+
+class CIRLBasePolicyAuxKarnet(pl.LightningModule):
+    """A simple convolution neural network"""
+
+    def __init__(self, model_config):
+        super(CIRLBasePolicyAuxKarnet, self).__init__()
 
         # Parameters
         self.cfg = model_config
@@ -756,13 +821,19 @@ class CIRLBasePolicyKARNet(pl.LightningModule):
 
         self.action_net = self.cfg['action_net']
 
-        self.combine_attn = nn.Sequential(
-            WeightedSelfAttention(input_dim=128), nn.ReLU()
-        )
+        if model_config['NORMALIZE_WEIGHT']:
+            self.combine_conv = nn.Sequential(
+                ConstrainedConv1d(4, 1, kernel_size=4, stride=1), nn.ReLU()
+            )
+        else:
+            self.combine_conv = nn.Sequential(
+                nn.Conv1d(4, 1, kernel_size=4, stride=1), nn.ReLU()
+            )
 
-        # Future latent vector prediction
-        self.carnet = self.set_parameter_requires_grad(self.cfg['carnet'])
-        # self.base_policy = self.cfg['base_policy']
+        # Future latent vector prediction and aux net
+        self.karnet = self.set_parameter_requires_grad(self.cfg['karnet'])
+        self.auxnet = self.set_parameter_requires_grad(self.cfg['auxnet'])
+
         self.back_bone_net = BaseResNet(obs_size)
         self.transition_layer = nn.LazyLinear(126)
 
@@ -772,70 +843,27 @@ class CIRLBasePolicyKARNet(pl.LightningModule):
         return model
 
     def forward(self, x, command, kalman=None):
+        # Future latent vector prediction
         batch_size, timesteps, C, H, W = x.size()
 
         # Future latent vector prediction
-        self.carnet.eval()
-        reconstructed, out_ae, embeddings, out = self.carnet(x, kalman)
+        self.karnet.eval()
+        reconstructed, out_ae, embeddings, out = self.karnet(x, kalman)
         embeddings = embeddings.view(batch_size, self.time_steps, -1)
         out = out.view(batch_size, self.time_steps, -1)
 
+        self.auxnet.eval()
+        actions, traffic_out, distance_out, embedding = self.auxnet(
+            x[:, -1, :, :, :], command
+        )
+
         # Base Policy
-        # self.base_policy.eval()
         base_x = self.back_bone_net(x[:, -1, :, :, :])
 
         combined_embeddings = torch.stack(
-            (embeddings[:, -1, :], out[:, -1, :], base_x), dim=1
+            (embedding, base_x, embeddings[:, -1, :], out[:, -1, :]), dim=1
         )
-        combined_embeddings = self.combine_attn(combined_embeddings)
-        combined_embeddings = torch.sum(combined_embeddings, dim=1)
-
-        # Transition layer
-        out = self.transition_layer(combined_embeddings)
-
-        # Action prediction
-        waypoints, speed = self.action_net(out, command)
-        return waypoints, speed
-
-
-class CIRLCARNet(pl.LightningModule):
-    """A simple convolution neural network"""
-
-    def __init__(self, model_config):
-        super(CIRLCARNet, self).__init__()
-
-        # Parameters
-        self.cfg = model_config
-        image_size = self.cfg['image_resize']
-        obs_size = self.cfg['seq_length']
-        self.time_steps = self.cfg['seq_length'] - 1
-
-        # Example inputs
-        self.example_input_array = torch.randn((2, obs_size, *image_size[1:]))
-        self.example_command = torch.tensor([1, 0, 2, 3, 1])
-
-        self.action_net = self.cfg['action_net']
-
-        # Future latent vector prediction
-        self.carnet = self.set_parameter_requires_grad(self.cfg['carnet'])
-        self.transition_layer = nn.LazyLinear(512)
-
-    def set_parameter_requires_grad(self, model):
-        for param in model.parameters():
-            param.requires_grad = False
-        return model
-
-    def forward(self, x, command, kalman=None):
-
-        batch_size, timesteps, C, H, W = x.size()
-
-        # Future latent vector prediction
-        self.carnet.eval()
-        reconstructed, out_ae, embeddings, out = self.carnet(x, kalman)
-
-        embeddings = embeddings.view(batch_size, self.time_steps, -1)
-        out = out.view(batch_size, self.time_steps, -1)
-        combined_embeddings = torch.hstack((embeddings[:, -1, :], out[:, -1, :]))
+        combined_embeddings = self.combine_conv(combined_embeddings).squeeze(1)
 
         # Transition layer
         out = self.transition_layer(combined_embeddings)
@@ -887,4 +915,4 @@ class AuxNet(pl.LightningModule):
         actions = self.action_net(embedding, command)
         traffic_out = self.traffic_net(embedding)
         distance_out = self.distance_net(embedding)
-        return actions, traffic_out, distance_out
+        return actions, traffic_out, distance_out, embedding

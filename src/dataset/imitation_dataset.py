@@ -110,7 +110,6 @@ def project_to_ego_frame(data):
 
 
 def calc_world_projection(ego_frame_coord, moving_direction, ego_location):
-
     ego_frame_coord[0] *= -1
     #  Find the rotation angle such the movement direction is always positive
     theta = find_in_between_angle(moving_direction, np.array([0.0, 1.0, 0.0]))
@@ -262,10 +261,16 @@ def concatenate_samples(samples, config):
 
     # Kalman update
     for data in combined_data['json'][:-1]:
-        updates = config['ekf'].update(data)
-        kalman_updates.append(transforms.ToTensor()(updates))
+        try:
+            updates = config['ekf'].update(data)
+            kalman_updates.append(transforms.ToTensor()(updates))
+        except KeyError:
+            pass
 
-    return images, command, action, torch.stack(kalman_updates)
+    if not kalman_updates:
+        return images, command, action, 0
+    else:
+        return images, command, action, torch.stack(kalman_updates)
 
 
 def concatenate_test_samples(samples, config):
@@ -321,7 +326,7 @@ def webdataset_data_iterator(config, sample_process=None):
 
     # Parameters
     BATCH_SIZE = config['BATCH_SIZE']
-    SEQ_LEN = config['obs_size']
+    SEQ_LEN = config['seq_length']
     number_workers = config['number_workers']
 
     # Create train, validation, test datasets and save them in a dictionary
