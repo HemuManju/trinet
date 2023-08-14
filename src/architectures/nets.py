@@ -19,7 +19,13 @@ from .layer_config import (
 
 from .layer_config_modified import layers_decoder_128, layers_encoder_128
 
-from .utils import build_conv_model, build_deconv_model, Flatten, get_model
+from .utils import (
+    build_conv_model,
+    build_deconv_model,
+    Flatten,
+    get_model,
+    ConstrainedConv1d,
+)
 
 
 class ConvNet(pl.LightningModule):
@@ -756,9 +762,14 @@ class CIRLBasePolicyKARNet(pl.LightningModule):
 
         self.action_net = self.cfg['action_net']
 
-        self.combine_conv = nn.Sequential(
-            nn.Conv1d(3, 1, kernel_size=3, stride=1), nn.ReLU()
-        )
+        if model_config['NORMALIZE_WEIGHT']:
+            self.combine_conv = nn.Sequential(
+                ConstrainedConv1d(3, 1, kernel_size=3, stride=1), nn.ReLU()
+            )
+        else:
+            self.combine_conv = nn.Sequential(
+                nn.Conv1d(3, 1, kernel_size=3, stride=1), nn.ReLU()
+            )
 
         # Future latent vector prediction
         self.carnet = self.set_parameter_requires_grad(self.cfg['carnet'])

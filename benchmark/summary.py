@@ -54,7 +54,7 @@ def consolidate_results(df):
 
 
 def summarize(read_path):
-    df = pd.read_csv(read_path, index_col=0)
+    df = pd.read_csv(read_path, index_col=0, skipfooter=1)
 
     new_labels = ['iteration', 'exp_id', 'navigation_type']
     df = df.set_index(keys=new_labels)

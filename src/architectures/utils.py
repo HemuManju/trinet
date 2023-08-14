@@ -2,6 +2,20 @@ from copy import deepcopy
 import torch
 
 from torch import nn
+import torch.nn.functional as F
+
+
+class ConstrainedConv1d(nn.Conv1d):
+    def forward(self, input):
+        return F.conv1d(
+            input,
+            F.softmax(self.weight, dim=1),
+            self.bias,
+            self.stride,
+            self.padding,
+            self.dilation,
+            self.groups,
+        )
 
 
 def build_conv_model(image_size, layer_config):

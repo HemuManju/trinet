@@ -101,7 +101,10 @@ with skip_run('skip', 'carnet_training') as check, check():
         model = RNNEncoder(cfg, net, data_loader)
     else:
         model = Autoencoder.load_from_checkpoint(
-            cfg['check_point_path'], hparams=cfg, net=net, data_loader=data_loader,
+            cfg['check_point_path'],
+            hparams=cfg,
+            net=net,
+            data_loader=data_loader,
         )
     # Trainer
     trainer = pl.Trainer(
@@ -159,7 +162,10 @@ with skip_run('skip', 'carnet_with_kalman_training') as check, check():
         model = KalmanRNNEncoder(cfg, net, data_loader)
     else:
         model = KalmanRNNEncoder.load_from_checkpoint(
-            cfg['check_point_path'], hparams=cfg, net=net, data_loader=data_loader,
+            cfg['check_point_path'],
+            hparams=cfg,
+            net=net,
+            data_loader=data_loader,
         )
     # Trainer
     trainer = pl.Trainer(
@@ -223,7 +229,10 @@ with skip_run('skip', 'imitation_with_kalman_carnet') as check, check():
         model = Imitation(cfg, net, data_loader)
     else:
         model = Imitation.load_from_checkpoint(
-            cfg['check_point_path'], hparams=cfg, net=net, data_loader=data_loader,
+            cfg['check_point_path'],
+            hparams=cfg,
+            net=net,
+            data_loader=data_loader,
         )
     # Trainer
     trainer = pl.Trainer(
@@ -276,9 +285,7 @@ with skip_run('skip', 'imitation_with_kanet_base_policy_conv') as check, check()
     cfg['ekf'] = ExtendedKalmanFilter(cfg)
 
     # Base Policy
-    # read_path = 'logs/2022-10-15/IMITATION/last.ckpt'
     base_policy = CIRLWaypointPolicy(cfg)
-    # base_policy = load_checkpoint(base_policy, checkpoint_path=read_path, strict=False)
     cfg['base_policy'] = base_policy
 
     # Over all network
@@ -291,7 +298,10 @@ with skip_run('skip', 'imitation_with_kanet_base_policy_conv') as check, check()
         model = Imitation(cfg, net, data_loader)
     else:
         model = Imitation.load_from_checkpoint(
-            cfg['check_point_path'], hparams=cfg, net=net, data_loader=data_loader,
+            cfg['check_point_path'],
+            hparams=cfg,
+            net=net,
+            data_loader=data_loader,
         )
     # Trainer
     if cfg['slurm']:
@@ -393,7 +403,6 @@ with skip_run('skip', 'benchmark_trained_carnet_model') as check, check():
     # Get all the experiment configs
     all_experiment_configs = experiment_suite.get_experiment_configs()
     for exp_id, config in enumerate(all_experiment_configs):
-
         # Update the summary writer info
         town = config['town']
         navigation_type = config['navigation_type']
@@ -432,7 +441,7 @@ with skip_run('skip', 'benchmark_trained_carnet_model') as check, check():
     # Kill all servers
     kill_all_servers()
 
-with skip_run('run', 'summarize_benchmark') as check, check():
+with skip_run('skip', 'summarize_benchmark') as check, check():
     # Load the configuration
     cfg = yaml.load(open('configs/imitation.yaml'), Loader=yaml.SafeLoader)
     cfg['logs_path'] = cfg['logs_path'] + str(date.today()) + '/WARMSTART'
