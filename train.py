@@ -14,7 +14,7 @@ import pytorch_lightning as pl
 from benchmark.core.carla_core import CarlaCore
 from benchmark.core.carla_core import kill_all_servers
 
-from src.dataset.sample_processors import rnn_samples
+from src.dataset.sample_processors import rnn_samples, semseg_aux_samples
 from src.dataset import imitation_dataset
 from src.dataset.imitation_dataset import concatenate_aux_samples
 from src.dataset.utils import (
@@ -24,15 +24,16 @@ from src.dataset.utils import (
 
 from src.architectures.nets import (
     CARNet,
-    CARNetExtended,
     CNNAutoEncoder,
     AutoRegressorBranchNet,
-    CIRLBasePolicyKARNet,
+    CIRLBasePolicyAux,
     CIRLWaypointPolicy,
     AuxNet,
+    SemanticAuxNet,
 )
 
 from src.models.imitation import Imitation, AuxiliaryTraining
+from src.models.encoding import SemanticAuxSegmentation
 from src.models.kalman import ExtendedKalmanFilter
 from src.models.utils import load_checkpoint, number_parameters
 from src.evaluate.agents import PIDCILAgent, PIDKalmanAgent
@@ -80,10 +81,10 @@ with skip_run('skip', 'dataset_analysis') as check, check():
     plt.hist(distance_to_vehicle)
     plt.show()
 
-with skip_run('run', 'auxillary_net_training') as check, check():
+with skip_run('skip', 'auxillary_net_training') as check, check():
     # Load the configuration
     cfg = yaml.load(open('configs/auxnet.yaml'), Loader=yaml.SafeLoader)
-    cfg['logs_path'] = cfg['logs_path'] + str(date.today()) + '/IMITATION_KALMAN'
+    cfg['logs_path'] = cfg['logs_path'] + str(date.today()) + '/AUXILIARY'
 
     # Random seed
     gpus = get_num_gpus()
@@ -106,7 +107,7 @@ with skip_run('run', 'auxillary_net_training') as check, check():
     )
 
     net = AuxNet(cfg)
-    actions, traffic, vehicle_dist = net(net.example_input_array, net.example_command)
+    # actions, traffic, vehicle_dist = net(net.example_input_array, net.example_command)
 
     # Dataloader
     data_loader = imitation_dataset.webdataset_data_iterator(
@@ -116,22 +117,101 @@ with skip_run('run', 'auxillary_net_training') as check, check():
         model = AuxiliaryTraining(cfg, net, data_loader)
     else:
         model = AuxiliaryTraining.load_from_checkpoint(
-            cfg['check_point_path'], hparams=cfg, net=net, data_loader=data_loader,
+            cfg['check_point_path'],
+            hparams=cfg,
+            net=net,
+            data_loader=data_loader,
         )
     # Trainer
-    trainer = pl.Trainer(
-        gpus=gpus,
-        max_epochs=cfg['NUM_EPOCHS'],
-        logger=logger,
-        callbacks=[checkpoint_callback],
-        enable_progress_bar=False,
-    )
+    if cfg['slurm']:
+        trainer = pl.Trainer(
+            accelerator='gpu',
+            gpus=gpus,
+            max_epochs=cfg['NUM_EPOCHS'],
+            logger=logger,
+            callbacks=[checkpoint_callback],
+            enable_progress_bar=False,
+            strategy="ddp",
+            num_nodes=1,
+        )
+    else:
+        trainer = pl.Trainer(
+            gpus=gpus,
+            max_epochs=cfg['NUM_EPOCHS'],
+            logger=logger,
+            callbacks=[checkpoint_callback],
+            enable_progress_bar=False,
+        )
+
     trainer.fit(model)
 
-with skip_run('skip', 'imitation_with_kanet_base_policy_attn') as check, check():
+with skip_run('skip', 'auxillary_net_semseg_training') as check, check():
+    # Load the configuration
+    cfg = yaml.load(open('configs/auxnet.yaml'), Loader=yaml.SafeLoader)
+    cfg['logs_path'] = cfg['logs_path'] + str(date.today()) + '/AUXILIARY'
+
+    # Random seed
+    gpus = get_num_gpus()
+    torch.manual_seed(cfg['pytorch_seed'])
+
+    # Checkpoint
+    navigation_type = cfg['navigation_types'][0]
+    cfg['raw_data_path'] = cfg['raw_data_path'] + f'/{navigation_type}'
+
+    checkpoint_callback = pl.callbacks.ModelCheckpoint(
+        monitor='losses/val_loss',
+        dirpath=cfg['logs_path'],
+        save_top_k=1,
+        filename=f'imitation_{navigation_type}',
+        mode='min',
+        save_last=True,
+    )
+    logger = pl.loggers.TensorBoardLogger(
+        cfg['logs_path'], name=f'imitation_{navigation_type}'
+    )
+
+    net = SemanticAuxNet(cfg)
+    reconstructed, traffic, vehicle_dist, embeddings = net(net.example_input_array)
+    # Dataloader
+    data_loader = imitation_dataset.webdataset_data_iterator(
+        cfg, sample_process=semseg_aux_samples
+    )
+    if cfg['check_point_path'] is None:
+        model = SemanticAuxSegmentation(cfg, net, data_loader)
+    else:
+        model = SemanticAuxSegmentation.load_from_checkpoint(
+            cfg['check_point_path'],
+            hparams=cfg,
+            net=net,
+            data_loader=data_loader,
+        )
+    # Trainer
+    if cfg['slurm']:
+        trainer = pl.Trainer(
+            accelerator='gpu',
+            gpus=gpus,
+            max_epochs=cfg['NUM_EPOCHS'],
+            logger=logger,
+            callbacks=[checkpoint_callback],
+            enable_progress_bar=False,
+            strategy="ddp",
+            num_nodes=1,
+        )
+    else:
+        trainer = pl.Trainer(
+            gpus=gpus,
+            max_epochs=cfg['NUM_EPOCHS'],
+            logger=logger,
+            callbacks=[checkpoint_callback],
+            enable_progress_bar=False,
+        )
+
+    trainer.fit(model)
+
+with skip_run('skip', 'imitation_with_aux_base_policy_attn') as check, check():
     # Load the configuration
     cfg = yaml.load(open('configs/imitation.yaml'), Loader=yaml.SafeLoader)
-    cfg['logs_path'] = cfg['logs_path'] + str(date.today()) + '/IMITATION_KALMAN'
+    cfg['logs_path'] = cfg['logs_path'] + str(date.today()) + '/IMITATION_AUX_BASE'
 
     # Random seed
     gpus = get_num_gpus()
@@ -155,26 +235,21 @@ with skip_run('skip', 'imitation_with_kanet_base_policy_attn') as check, check()
 
     # Setup
     # Load the backbone network
-    read_path = 'logs/2023-01-03/CARNET_KALMAN/last.ckpt'
-    cnn_autoencoder = CNNAutoEncoder(cfg)
-    carnet = CARNetExtended(cfg, cnn_autoencoder)
-    carnet = load_checkpoint(carnet, checkpoint_path=read_path)
-    cfg['carnet'] = carnet
+    read_path = 'logs/2023-07-01/AUXILIARY/last.ckpt'
+    auxnet = AuxNet(cfg)
+    cfg['auxnet'] = load_checkpoint(auxnet, checkpoint_path=read_path)
 
     # Action net
     action_net = AutoRegressorBranchNet(dropout=0, hparams=cfg)
     cfg['action_net'] = action_net
-
-    # Kalmnn filter
-    cfg['ekf'] = ExtendedKalmanFilter(cfg)
 
     # Base Policy
     base_policy = CIRLWaypointPolicy(cfg)
     cfg['base_policy'] = base_policy
 
     # Over all network
-    net = CIRLBasePolicyKARNet(cfg)
-    net(net.example_input_array, net.example_command, net.example_kalman)
+    net = CIRLBasePolicyAux(cfg)
+    net(net.example_input_array, net.example_command)
 
     # Dataloader
     data_loader = imitation_dataset.webdataset_data_iterator(cfg)
@@ -182,7 +257,10 @@ with skip_run('skip', 'imitation_with_kanet_base_policy_attn') as check, check()
         model = Imitation(cfg, net, data_loader)
     else:
         model = Imitation.load_from_checkpoint(
-            cfg['check_point_path'], hparams=cfg, net=net, data_loader=data_loader,
+            cfg['check_point_path'],
+            hparams=cfg,
+            net=net,
+            data_loader=data_loader,
         )
     # Trainer
     if cfg['slurm']:
@@ -232,37 +310,26 @@ with skip_run('skip', 'benchmark_trained_aux_base') as check, check():
         weather = config['weather']
         config['summary_writer']['directory'] = f'{town}_{navigation_type}_{weather}'
 
-        # Update the model
-
-        cnn_autoencoder = CNNAutoEncoder(cfg)
-        carnet = CARNetExtended(cfg, cnn_autoencoder)
-        carnet = load_checkpoint(carnet, checkpoint_path=read_path)
-        cfg['carnet'] = carnet
+        auxnet = AuxNet(cfg)
+        cfg['auxnet'] = auxnet
 
         # Action net
         action_net = AutoRegressorBranchNet(dropout=0, hparams=cfg)
-        # read_path = 'logs/action_net.pt'
-        # action_net = load_checkpoint(
-        #     action_net, checkpoint_path=read_path, only_weights=True, strict=False
-        # )
         cfg['action_net'] = action_net
 
         # Base Policy
         read_path = 'logs/2022-10-15/IMITATION/last.ckpt'
         base_policy = CIRLWaypointPolicy(cfg)
-        # base_policy = load_checkpoint(
-        #     base_policy, checkpoint_path=read_path, strict=False
-        # )
         cfg['base_policy'] = base_policy
 
         restore_config = {
-            'checkpoint_path': f'logs/2023-05-17/IMITATION_KALMAN/last.ckpt'
+            'checkpoint_path': f'logs/2023-07-25/IMITATION_AUX_BASE/last.ckpt'
         }
 
         model = Imitation.load_from_checkpoint(
             restore_config['checkpoint_path'],
             hparams=cfg,
-            net=CIRLBasePolicyKARNet(cfg),
+            net=CIRLBasePolicyAux(cfg),
             data_loader=None,
         )
 
@@ -294,7 +361,6 @@ with skip_run('skip', 'benchmark_trained_carnet_model') as check, check():
     # Get all the experiment configs
     all_experiment_configs = experiment_suite.get_experiment_configs()
     for exp_id, config in enumerate(all_experiment_configs):
-
         # Update the summary writer info
         town = config['town']
         navigation_type = config['navigation_type']
@@ -333,7 +399,7 @@ with skip_run('skip', 'benchmark_trained_carnet_model') as check, check():
     # Kill all servers
     kill_all_servers()
 
-with skip_run('run', 'summarize_benchmark') as check, check():
+with skip_run('skip', 'summarize_benchmark') as check, check():
     # Load the configuration
     cfg = yaml.load(open('configs/imitation.yaml'), Loader=yaml.SafeLoader)
     cfg['logs_path'] = cfg['logs_path'] + str(date.today()) + '/WARMSTART'
@@ -349,7 +415,7 @@ with skip_run('run', 'summarize_benchmark') as check, check():
     for town, weather, navigation_type in itertools.product(
         towns, weathers, navigation_types
     ):
-        path = f'logs/benchmark_results/{town}_{navigation_type}_{weather}_3/measurements.csv'
+        path = f'logs/benchmark_results/{town}_{navigation_type}_{weather}_2/measurements.csv'
         print('-' * 32)
         print(town, weather, navigation_type)
         summarize(path)

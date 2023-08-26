@@ -2,6 +2,7 @@ from copy import deepcopy
 import torch
 
 from torch import nn
+import torch.nn.functional as F
 
 
 def build_conv_model(image_size, layer_config):
@@ -32,7 +33,6 @@ def build_deconv_model(out_size, image_sizes, conv_layer_config):
         layer_type = layer.pop("type")
 
         if layer_type in ['Conv2d']:
-
             # Find the kernel size
             module = nn.ConvTranspose2d(
                 layer["out_channels"],
@@ -47,6 +47,19 @@ def build_deconv_model(out_size, image_sizes, conv_layer_config):
 
         modules.append(module)
     return nn.Sequential(*modules)
+
+
+class ConstrainedConv1d(nn.Conv1d):
+    def forward(self, input):
+        return F.conv1d(
+            input,
+            F.softmax(self.weight, dim=1),
+            self.bias,
+            self.stride,
+            self.padding,
+            self.dilation,
+            self.groups,
+        )
 
 
 class Flatten(nn.Module):

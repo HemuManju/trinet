@@ -16,7 +16,6 @@ import webdataset as wds
 
 
 def get_webdataset_data_iterator(config, sample_processors):
-
     # Get dataset path(s)
     paths = get_dataset_paths(config)
 
@@ -75,6 +74,12 @@ def labels_to_cityscapes_palette(image):
         result[np.where(image == key)] = value
 
     return result.astype(np.uint8)
+
+
+def show_tensor_image(img):
+    npimg = img.numpy()
+    plt.imshow(np.transpose(npimg, (1, 2, 0)), interpolation='nearest', origin='lower')
+    plt.show()
 
 
 def show_image(img, ax):
@@ -198,6 +203,9 @@ class WebDatasetReader:
         # Get the dataset
         dataset = self.get_dataset(concat_n_samples=concat_n_samples)
         data_loader = wds.WebLoader(
-            dataset, num_workers=num_workers, shuffle=False, batch_size=batch_size,
+            dataset,
+            num_workers=num_workers,
+            shuffle=False,
+            batch_size=batch_size,
         )
         return data_loader

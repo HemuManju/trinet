@@ -503,13 +503,13 @@ layers_decoder_256_128 = [
     {
         "type": "ConvTranspose2d",
         "in_channels": 2,
-        "out_channels": 1,
+        "out_channels": 23,
         "kernel_size": 3,
         "stride": 2,
         "padding": 1,
         "output_padding": 1,
     },
-    {"type": "BatchNorm2d", "num_features": 1, "momentum": bnm},
+    # {"type": "BatchNorm2d", "num_features": 1, "momentum": bnm},
     {"type": "Sigmoid"},
 ]
 
@@ -924,7 +924,7 @@ layers_decoder_256_256 = [
     {
         "type": "ConvTranspose2d",
         "in_channels": 4,
-        "out_channels": 1,
+        "out_channels": 23,
         "kernel_size": 3,
         "stride": 2,
         "padding": 1,

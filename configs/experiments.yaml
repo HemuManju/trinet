@@ -3,7 +3,7 @@ weathers: [
     # 'ClearNoon',
     'SoftRainNoon',
     # 'HardRainNoon',
-    'ClearSunset',
+    # 'ClearSunset',
   ]
 # 'SoftRainSunset',
 # 'HardRainSunset',

@@ -8,6 +8,8 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from pytorch_msssim import MS_SSIM
 from piq import MultiScaleSSIMLoss
 
+import torchmetrics
+
 from .utils import ChamferDistance, calc_ssim_kernel_size
 
 
@@ -109,6 +111,92 @@ class SemanticSegmentation(Autoencoder):
         criterion = nn.CrossEntropyLoss()
         loss = criterion(output.squeeze(1), labels)
 
+        self.log('losses/val_loss', loss, on_step=False, on_epoch=True)
+        return loss
+
+
+class SemanticAuxSegmentation(Autoencoder):
+    def __init__(self, hparams, net, data_loader):
+        super().__init__(hparams, net, data_loader)
+        self.h_params = hparams
+        self.net = net
+        self.data_loader = data_loader
+        self.accuracy_traffic = torchmetrics.Accuracy(task="multiclass", num_classes=2)
+        self.accuracy_vehicle_dist = torchmetrics.Accuracy(
+            task="multiclass", num_classes=5
+        )
+
+        # Save hyperparameters
+        self.save_hyperparameters(self.h_params)
+
+    def training_step(self, batch, batch_idx):
+        x, labels, action = batch[0], batch[1], batch[2]
+
+        # Predict and calculate loss
+        output, traffic_out, distance_out, embedding = self.forward(x)
+
+        criterion = nn.CrossEntropyLoss()
+
+        # Classification
+        criterion_traffic = nn.CrossEntropyLoss()
+        criterion_vehicle_dist = nn.CrossEntropyLoss()
+
+        loss = (
+            criterion(output.squeeze(1), labels)
+            + criterion_traffic(traffic_out, action[1])
+            + criterion_vehicle_dist(distance_out, action[2])
+        )
+
+        self.accuracy_traffic(traffic_out.argmax(dim=1), action[1])
+        self.accuracy_vehicle_dist(distance_out.argmax(dim=1), action[2])
+
+        self.log(
+            'train_traffic_accuracy',
+            self.accuracy_traffic,
+            on_step=False,
+            on_epoch=True,
+        )
+        self.log(
+            'train_vehicle_dist_accuracy',
+            self.accuracy_vehicle_dist,
+            on_step=False,
+            on_epoch=True,
+        )
+        self.log('losses/train_loss', loss, on_step=False, on_epoch=True)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, labels, action = batch[0], batch[1], batch[2]
+
+        # Predict and calculate loss
+        output, traffic_out, distance_out, embedding = self.forward(x)
+        criterion = nn.CrossEntropyLoss()
+
+        # Classification
+        criterion_traffic = nn.CrossEntropyLoss()
+        criterion_vehicle_dist = nn.CrossEntropyLoss()
+
+        loss = (
+            criterion(output.squeeze(1), labels)
+            + criterion_traffic(traffic_out, action[1])
+            + criterion_vehicle_dist(distance_out, action[2])
+        )
+
+        self.accuracy_traffic(traffic_out.argmax(dim=1), action[1])
+        self.accuracy_vehicle_dist(distance_out.argmax(dim=1), action[2])
+
+        self.log(
+            'val_traffic_accuracy',
+            self.accuracy_traffic,
+            on_step=False,
+            on_epoch=True,
+        )
+        self.log(
+            'val_vehicle_dist_accuracy',
+            self.accuracy_vehicle_dist,
+            on_step=False,
+            on_epoch=True,
+        )
         self.log('losses/val_loss', loss, on_step=False, on_epoch=True)
         return loss
 
