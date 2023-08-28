@@ -31,6 +31,7 @@ from src.architectures.nets import (
     CIRLBasePolicyAux,
     CIRLWaypointPolicy,
     AuxNet,
+    SemanticAuxNet,
 )
 
 from src.models.imitation import Imitation, AuxiliaryTraining
@@ -222,7 +223,7 @@ with skip_run('skip', 'imitation_with_aux_base_policy_attn') as check, check():
 
     trainer.fit(model)
 
-with skip_run('skip', 'imitation_with_base_aux_karnet_policy_attn') as check, check():
+with skip_run('skip', 'imitation_with_base_aux_karnet_policy_conv') as check, check():
     # Load the configuration
     cfg = yaml.load(open('configs/imitation.yaml'), Loader=yaml.SafeLoader)
     cfg['logs_path'] = (
@@ -264,6 +265,96 @@ with skip_run('skip', 'imitation_with_base_aux_karnet_policy_attn') as check, ch
     # Load the aux network
     read_path = 'logs/2023-07-01/AUXILIARY/last.ckpt'
     auxnet = AuxNet(cfg)
+    cfg['auxnet'] = load_checkpoint(auxnet, checkpoint_path=read_path)
+
+    # Action net
+    action_net = AutoRegressorBranchNet(dropout=0, hparams=cfg)
+    cfg['action_net'] = action_net
+
+    # Base Policy
+    base_policy = CIRLWaypointPolicy(cfg)
+    cfg['base_policy'] = base_policy
+
+    # Over all network
+    net = CIRLBasePolicyAuxKarnet(cfg)
+    net(net.example_input_array, net.example_command, net.example_kalman)
+
+    # Dataloader
+    data_loader = imitation_dataset.webdataset_data_iterator(cfg)
+    if cfg['check_point_path'] is None:
+        model = Imitation(cfg, net, data_loader)
+    else:
+        model = Imitation.load_from_checkpoint(
+            cfg['check_point_path'],
+            hparams=cfg,
+            net=net,
+            data_loader=data_loader,
+        )
+    # Trainer
+    if cfg['slurm']:
+        trainer = pl.Trainer(
+            accelerator='gpu',
+            gpus=gpus,
+            max_epochs=cfg['NUM_EPOCHS'],
+            logger=logger,
+            callbacks=[checkpoint_callback],
+            enable_progress_bar=False,
+            strategy="ddp",
+            num_nodes=1,
+        )
+    else:
+        trainer = pl.Trainer(
+            gpus=gpus,
+            max_epochs=cfg['NUM_EPOCHS'],
+            logger=logger,
+            callbacks=[checkpoint_callback],
+            enable_progress_bar=True,
+        )
+
+    trainer.fit(model)
+
+with skip_run('run', 'imitation_with_base_aux_seg_karnet_conv') as check, check():
+    # Load the configuration
+    cfg = yaml.load(open('configs/imitation.yaml'), Loader=yaml.SafeLoader)
+    cfg['logs_path'] = (
+        cfg['logs_path'] + str(date.today()) + '/IMITATION_AUX_KARNET_BASE'
+    )
+
+    # Random seed
+    gpus = get_num_gpus()
+    torch.manual_seed(cfg['pytorch_seed'])
+
+    # Checkpoint
+    navigation_type = cfg['navigation_types'][0]
+    cfg['raw_data_path'] = cfg['raw_data_path'] + f'/{navigation_type}'
+
+    checkpoint_callback = pl.callbacks.ModelCheckpoint(
+        monitor='losses/val_loss',
+        dirpath=cfg['logs_path'],
+        save_top_k=1,
+        filename=f'imitation_{navigation_type}',
+        mode='min',
+        save_last=True,
+    )
+    logger = pl.loggers.TensorBoardLogger(
+        cfg['logs_path'], name=f'imitation_{navigation_type}'
+    )
+
+    # Setup
+
+    # Load the karnet
+    read_path = 'logs/2023-01-03/CARNET_KALMAN/last.ckpt'
+    cnn_autoencoder = CNNAutoEncoder(cfg)
+    carnet = CARNetExtended(cfg, cnn_autoencoder)
+    carnet = load_checkpoint(carnet, checkpoint_path=read_path)
+    cfg['karnet'] = carnet
+
+    # Kalmnn filter
+    cfg['ekf'] = ExtendedKalmanFilter(cfg)
+
+    # Load the aux network
+    read_path = 'logs/2023-08-26/AUXILIARY/last.ckpt'
+    auxnet = SemanticAuxNet(cfg)
     cfg['auxnet'] = load_checkpoint(auxnet, checkpoint_path=read_path)
 
     # Action net
@@ -357,7 +448,7 @@ with skip_run('skip', 'benchmark_trained_aux_karnet_base') as check, check():
         cfg['base_policy'] = base_policy
 
         restore_config = {
-            'checkpoint_path': f'logs/2023-07-31/IMITATION_AUX_KARNET_BASE/last.ckpt'
+            'checkpoint_path': f'logs/2023-08-14/IMITATION_AUX_KARNET_BASE/last.ckpt'
         }
 
         model = Imitation.load_from_checkpoint(

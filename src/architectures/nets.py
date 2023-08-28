@@ -191,7 +191,7 @@ class CNNAutoEncoder(pl.LightningModule):
         self.hidden_size: size of hidden layers
     """
 
-    def __init__(self, hparams):
+    def __init__(self, hparams, aux_tasks=False):
         super(CNNAutoEncoder, self).__init__()
 
         # Parameters
@@ -226,6 +226,11 @@ class CNNAutoEncoder(pl.LightningModule):
 
         # Encoder and decoder network
         self.encoder = get_model(hparams["autoencoder_config"]['layers_encoder'])
+
+        if aux_tasks:
+            hparams["autoencoder_config"]['layers_decoder'][-3]['out_channels'] = 23
+            hparams["autoencoder_config"]['layers_decoder'].pop(-2)
+
         self.decoder = get_model(hparams["autoencoder_config"]['layers_decoder'])
 
     def encode(self, x):
@@ -823,11 +828,11 @@ class CIRLBasePolicyAuxKarnet(pl.LightningModule):
 
         if model_config['NORMALIZE_WEIGHT']:
             self.combine_conv = nn.Sequential(
-                ConstrainedConv1d(4, 1, kernel_size=4, stride=1), nn.ReLU()
+                ConstrainedConv1d(4, 1, kernel_size=1, stride=1), nn.ReLU()
             )
         else:
             self.combine_conv = nn.Sequential(
-                nn.Conv1d(4, 1, kernel_size=4, stride=1), nn.ReLU()
+                nn.Conv1d(4, 1, kernel_size=(4, 1), stride=1), nn.ReLU()
             )
 
         # Future latent vector prediction and aux net
@@ -916,3 +921,46 @@ class AuxNet(pl.LightningModule):
         traffic_out = self.traffic_net(embedding)
         distance_out = self.distance_net(embedding)
         return actions, traffic_out, distance_out, embedding
+
+
+class SemanticAuxNet(pl.LightningModule):
+    """A simple convolution neural network"""
+
+    def __init__(self, model_config):
+        super(SemanticAuxNet, self).__init__()
+
+        # Parameters
+        self.cfg = model_config
+        image_size = self.cfg['image_resize']
+        obs_size = self.cfg['obs_size']
+        n_actions = self.cfg['n_actions']
+        dropout = self.cfg['DROP_OUT']
+
+        # Example inputs
+        self.example_input_array = torch.randn(
+            (5, obs_size, image_size[1], image_size[2])
+        )
+        self.example_command = torch.tensor([1, 0, 2, 3, 1])
+        self.layer_size = 64
+
+        self.back_bone_net = CNNAutoEncoder(model_config, aux_tasks=True)
+        self.traffic_net = nn.Sequential(
+            nn.LazyLinear(self.layer_size),
+            nn.ReLU(),
+            nn.Linear(self.layer_size, self.layer_size // 2),
+            nn.ReLU(),
+            nn.Linear(self.layer_size // 2, 2),
+        )
+        self.distance_net = nn.Sequential(
+            nn.LazyLinear(self.layer_size),
+            nn.ReLU(),
+            nn.Linear(self.layer_size, self.layer_size // 2),
+            nn.ReLU(),
+            nn.Linear(self.layer_size // 2, 5),
+        )
+
+    def forward(self, x, command=None):
+        reconstructed, embedding = self.back_bone_net(x)
+        traffic_out = self.traffic_net(embedding)
+        distance_out = self.distance_net(embedding)
+        return reconstructed, traffic_out, distance_out, embedding

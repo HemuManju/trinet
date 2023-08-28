@@ -33,7 +33,6 @@ def build_deconv_model(out_size, image_sizes, conv_layer_config):
         layer_type = layer.pop("type")
 
         if layer_type in ['Conv2d']:
-
             # Find the kernel size
             module = nn.ConvTranspose2d(
                 layer["out_channels"],
@@ -103,7 +102,7 @@ def convtransp_kernel_shape(
 def get_model(config) -> nn.Module:
     """Get model from layer config dictionary."""
     modules = []
-    for l in config:
+    for l in deepcopy(config):
         layer_type = l.pop("type")
         layer = getattr(torch.nn, layer_type)(**l)
         modules.append(layer)
