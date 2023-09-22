@@ -42,11 +42,10 @@ def build_deconv_model(out_size, image_sizes, conv_layer_config):
     """Get model from layer config dictionary."""
     modules = []
 
-    for layer in reversed(conv_layer_config):
+    for layer in deepcopy(reversed(conv_layer_config)):
         layer_type = layer.pop("type")
 
         if layer_type in ['Conv2d']:
-
             # Find the kernel size
             module = nn.ConvTranspose2d(
                 layer["out_channels"],

@@ -6,6 +6,7 @@ LEARNING_RATE: 0.001
 DROP_OUT: 0.10
 TEST_SIZE: 0.15
 VALID_SIZE: 0.15
+NORMALIZE_WEIGHT: False
 
 ##-----------------------------------------------------#
 # Data Parameters

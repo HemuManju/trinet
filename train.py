@@ -1,5 +1,5 @@
 import os
-from datetime import date
+from datetime import date, datetime
 import itertools
 
 import numpy as np
@@ -244,7 +244,7 @@ with skip_run('skip', 'imitation_with_kalman_carnet') as check, check():
     )
     trainer.fit(model)
 
-with skip_run('skip', 'imitation_with_kanet_base_policy_conv') as check, check():
+with skip_run('run', 'imitation_with_kanet_base_policy_conv') as check, check():
     # Load the configuration
     cfg = yaml.load(open('configs/imitation.yaml'), Loader=yaml.SafeLoader)
     cfg['logs_path'] = cfg['logs_path'] + str(date.today()) + '/IMITATION_KALMAN'
@@ -255,7 +255,10 @@ with skip_run('skip', 'imitation_with_kanet_base_policy_conv') as check, check()
 
     # Checkpoint
     navigation_type = cfg['navigation_types'][0]
-    cfg['raw_data_path'] = cfg['raw_data_path'] + f'/{navigation_type}'
+    if cfg['slurm']:
+        cfg['raw_data_path'] = cfg['raw_data_path_slurm'] + f'/{navigation_type}'
+    else:
+        cfg['raw_data_path'] = cfg['raw_data_path_local'] + f'/{navigation_type}'
 
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
         monitor='losses/val_loss',
@@ -321,7 +324,7 @@ with skip_run('skip', 'imitation_with_kanet_base_policy_conv') as check, check()
             max_epochs=cfg['NUM_EPOCHS'],
             logger=logger,
             callbacks=[checkpoint_callback],
-            enable_progress_bar=False,
+            enable_progress_bar=True,
         )
 
     trainer.fit(model)
@@ -350,6 +353,10 @@ with skip_run('skip', 'benchmark_trained_karnet_base') as check, check():
         navigation_type = config['navigation_type']
         weather = config['weather']
         config['summary_writer']['directory'] = f'{town}_{navigation_type}_{weather}'
+        config['summary_writer'][
+            'write_path'
+        ] = f'logs/benchmark_unconstrained_{datetime.now().strftime("%d_%m_%Y_%H_%M_%S")}'
+        config['summary_writer']['message'] = 'base + karnet unconstrained convolution'
 
         # Update the model
 
@@ -365,8 +372,12 @@ with skip_run('skip', 'benchmark_trained_karnet_base') as check, check():
         base_policy = CIRLWaypointPolicy(cfg)
         cfg['base_policy'] = base_policy
 
+        # restore_config = {
+        #     'checkpoint_path': f'logs/2023-05-17/IMITATION_KALMAN/last.ckpt'
+        # }
+
         restore_config = {
-            'checkpoint_path': f'logs/2023-05-17/IMITATION_KALMAN/last.ckpt'
+            'checkpoint_path': f'logs/2023-09-10/IMITATION_KALMAN/last.ckpt'
         }
 
         model = Imitation.load_from_checkpoint(
@@ -445,6 +456,7 @@ with skip_run('skip', 'summarize_benchmark') as check, check():
     # Load the configuration
     cfg = yaml.load(open('configs/imitation.yaml'), Loader=yaml.SafeLoader)
     cfg['logs_path'] = cfg['logs_path'] + str(date.today()) + '/WARMSTART'
+    benchmark_dir = 'logs/benchmark_unconstrained_11_09_2023_20_35_29'
 
     # towns = ['Town02', 'Town01']
     # weathers = ['ClearSunset', 'SoftRainNoon']
@@ -457,7 +469,7 @@ with skip_run('skip', 'summarize_benchmark') as check, check():
     for town, weather, navigation_type in itertools.product(
         towns, weathers, navigation_types
     ):
-        path = f'logs/benchmark_results/{town}_{navigation_type}_{weather}_3/measurements.csv'
+        path = f'{benchmark_dir}/{town}_{navigation_type}_{weather}/measurements.csv'
         print('-' * 32)
         print(town, weather, navigation_type)
         summarize(path)

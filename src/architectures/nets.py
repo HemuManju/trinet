@@ -257,7 +257,7 @@ class MLP(pl.LightningModule):
             nn.Linear(self.layer_size, self.layer_size // 2),
             nn.ReLU(),
             nn.Linear(self.layer_size // 2, output_size),
-            nn.ReLU(),
+            # nn.ReLU(),
         )
 
     def forward(self, x):
@@ -355,7 +355,6 @@ class CARNet(pl.LightningModule):
         self.after_rnn = nn.LazyLinear(latent_size)
 
     def forward(self, x, k_states=None):
-
         batch_size, timesteps, C, H, W = x.size()
         # Encoder
         embeddings = self.cnn_autoencoder.encode(
@@ -413,7 +412,6 @@ class CARNetExtended(pl.LightningModule):
         self.after_rnn = nn.LazyLinear(latent_size)
 
     def forward(self, x, kalman=None):
-
         batch_size, timesteps, C, H, W = x.size()
         # Encoder
         cnn_embeddings = self.cnn_autoencoder.encode(
@@ -620,6 +618,9 @@ class AutoRegressorBranchNet(pl.LightningModule):
         self.waypoints_branch = nn.ModuleList(
             [AutoRegressor(hparams, self.layer_size) for i in range(4)]
         )
+        self.speed_branch = nn.ModuleList(
+            [MLP(self.layer_size, 1, 0) for i in range(4)]
+        )
 
     def forward(self, x, command):
         waypoints = torch.cat(
@@ -630,13 +631,12 @@ class AutoRegressorBranchNet(pl.LightningModule):
         )
 
         # Speed prediction
-        # speed = torch.cat(
-        #     [
-        #         self.speed_branch[i - 1](x_in)
-        #         for x_in, i in zip(x, command.to(torch.int))
-        #     ]
-        # )
-        speed = 0
+        speed = torch.cat(
+            [
+                self.speed_branch[i - 1](x_in)
+                for x_in, i in zip(x, command.to(torch.int))
+            ]
+        )
         return waypoints, speed
 
 
@@ -764,11 +764,11 @@ class CIRLBasePolicyKARNet(pl.LightningModule):
 
         if model_config['NORMALIZE_WEIGHT']:
             self.combine_conv = nn.Sequential(
-                ConstrainedConv1d(3, 1, kernel_size=3, stride=1), nn.ReLU()
+                ConstrainedConv1d(3, 1, kernel_size=1, stride=1), nn.ReLU()
             )
         else:
             self.combine_conv = nn.Sequential(
-                nn.Conv1d(3, 1, kernel_size=3, stride=1), nn.ReLU()
+                nn.Conv1d(3, 1, kernel_size=1, stride=1), nn.ReLU()
             )
 
         # Future latent vector prediction
@@ -836,7 +836,6 @@ class CIRLCARNet(pl.LightningModule):
         return model
 
     def forward(self, x, command, kalman=None):
-
         batch_size, timesteps, C, H, W = x.size()
 
         # Future latent vector prediction
