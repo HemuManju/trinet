@@ -257,7 +257,6 @@ class MLP(pl.LightningModule):
             nn.Linear(self.layer_size, self.layer_size // 2),
             nn.ReLU(),
             nn.Linear(self.layer_size // 2, output_size),
-            nn.ReLU(),
         )
 
     def forward(self, x):
@@ -619,6 +618,10 @@ class AutoRegressorBranchNet(pl.LightningModule):
             [AutoRegressor(hparams, self.layer_size) for i in range(4)]
         )
 
+        self.speed_branch = nn.ModuleList(
+            [MLP(self.layer_size, 1, 0) for i in range(4)]
+        )
+
     def forward(self, x, command):
         waypoints = torch.cat(
             [
@@ -628,13 +631,13 @@ class AutoRegressorBranchNet(pl.LightningModule):
         )
 
         # Speed prediction
-        # speed = torch.cat(
-        #     [
-        #         self.speed_branch[i - 1](x_in)
-        #         for x_in, i in zip(x, command.to(torch.int))
-        #     ]
-        # )
-        speed = 0
+        speed = torch.cat(
+            [
+                self.speed_branch[i - 1](x_in)
+                for x_in, i in zip(x, command.to(torch.int))
+            ]
+        )
+
         return waypoints, speed
 
 
@@ -761,11 +764,11 @@ class CIRLBasePolicyAux(pl.LightningModule):
 
         if model_config['NORMALIZE_WEIGHT']:
             self.combine_conv = nn.Sequential(
-                ConstrainedConv1d(2, 1, kernel_size=2, stride=1), nn.ReLU()
+                ConstrainedConv1d(2, 1, kernel_size=1, stride=1), nn.ReLU()
             )
         else:
             self.combine_conv = nn.Sequential(
-                nn.Conv1d(2, 1, kernel_size=2, stride=1), nn.ReLU()
+                nn.Conv1d(2, 1, kernel_size=1, stride=1), nn.ReLU()
             )
 
         # Future latent vector prediction
@@ -785,7 +788,7 @@ class CIRLBasePolicyAux(pl.LightningModule):
 
         # Future latent vector prediction
         self.auxnet.eval()
-        actions, traffic_out, distance_out, embedding = self.auxnet(x, command)
+        actions, traffic_out, distance_out, embedding = self.auxnet(x)
 
         # Base Policy
         base_x = self.back_bone_net(x)

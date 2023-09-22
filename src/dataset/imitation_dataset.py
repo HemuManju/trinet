@@ -140,33 +140,20 @@ def calculate_angle(v0, v1):
     return theta
 
 
-def resample_waypoints(waypoints, current_location, resample=False):
+def resample_waypoints(waypoints, resample=False):
     if resample:
-        xy = np.array(waypoints)
+        xy = waypoints
         x = xy[:, 0]
-        y = xy[:, 1]
-
-        # Add initial location
-        x = np.insert(x, 0, current_location[0])
-        y = np.insert(y, 0, current_location[1])
-
-        # Shift the frame to origin
-        # x = x - x[0]
-        # y = y - y[0]
+        y = xy[0:, 1]
 
         # get the cumulative distance along the contour
         dist = np.sqrt((x[:-1] - x[1:]) ** 2 + (y[:-1] - y[1:]) ** 2)
         dist_along = np.concatenate(([0], dist.cumsum()))
 
-        # build a spline representation of the contour
-        try:
-            spline, u = scipy.interpolate.splprep([x, y], u=dist_along, s=0)
-            # resample it at smaller distance intervals
-            interp_d = np.linspace(dist_along[0], dist_along[-1], 10)
-            interp_x, interp_y = scipy.interpolate.splev(interp_d, spline)
-        except ValueError:
-            interp_x = x
-            interp_y = y
+        # Uniform interpolation
+        t = np.linspace(0, dist_along.max(), len(x))
+        interp_x = np.interp(t, dist_along, x)
+        interp_y = np.interp(t, dist_along, y)
 
         processed_waypoints = np.vstack((interp_x, interp_y)).T
     else:

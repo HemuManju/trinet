@@ -7,6 +7,7 @@ import math
 
 import numpy as np
 import matplotlib.pyplot as plt
+import shapely.geometry as shp
 
 from torchvision import transforms
 
@@ -47,6 +48,61 @@ def get_webdataset_data_iterator(config, sample_processors):
             data_iterator[key] = data_loader
 
     return data_iterator
+
+
+def get_specific_webdataset_data_iterator(config, path, sample_processors):
+    # Parameter(s)
+    BATCH_SIZE = config['BATCH_SIZE']
+    SEQ_LEN = config['seq_length'] + config['predict_length']
+    number_workers = config['number_workers']
+
+    if path:
+        dataset = (
+            wds.WebDataset(path, shardshuffle=False)
+            .decode("torchrgb")
+            .then(generate_seqs, sample_processors, SEQ_LEN, config)
+        )
+        data_loader = wds.WebLoader(
+            dataset,
+            num_workers=number_workers,
+            shuffle=False,
+            batch_size=BATCH_SIZE,
+        )
+
+    return data_loader
+
+
+def resample_waypoints(waypoints, current_location, resample=False):
+    if resample:
+        xy = waypoints
+        x = xy[:, 0]
+        y = xy[0:, 1]
+
+        # get the cumulative distance along the contour
+        dist = np.sqrt((x[:-1] - x[1:]) ** 2 + (y[:-1] - y[1:]) ** 2)
+        dist_along = np.concatenate(([0], dist.cumsum()))
+
+        # Uniform interpolation
+        t = np.linspace(0, dist_along.max(), len(x))
+        interp_x = np.interp(t, dist_along, x)
+        interp_y = np.interp(t, dist_along, y)
+
+        processed_waypoints = np.vstack((interp_x, interp_y)).T
+    else:
+        processed_waypoints = np.array(waypoints)[:, 0:2]
+    return processed_waypoints
+
+
+def offset_points(points, distance):
+    # Create a Polygon from the nx2 array
+    org_poly = shp.LineString(points)
+
+    from shapely.plotting import plot_line
+
+    # Create offset
+    new_poly = org_poly.parallel_offset(distance, 'left', join_style=2, mitre_limit=100)
+    new_poly_points = np.asarray(new_poly.coords)[:, :2]
+    return new_poly_points
 
 
 def labels_to_cityscapes_palette(image):
