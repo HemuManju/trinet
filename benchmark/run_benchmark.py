@@ -32,7 +32,6 @@ def get_nonexistant_path(fname_path):
 
 def create_directory(write_path):
     if not os.path.exists(write_path):
-
         # Create a new directory because it does not exist
         os.makedirs(write_path)
         print("Created new data directory!")
@@ -52,6 +51,9 @@ class DataRecorder:
             self.write_path = get_nonexistant_path(
                 f'logs/benchmark_results/{directory}'
             )
+        else:
+            self.write_path = get_nonexistant_path(f'{self.write_path}/{directory}')
+
         # Create a directory
         create_directory(self.write_path)
         self.all_data = []

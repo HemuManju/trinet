@@ -262,7 +262,7 @@ class MLP(pl.LightningModule):
             nn.Linear(self.layer_size, self.layer_size // 2),
             nn.ReLU(),
             nn.Linear(self.layer_size // 2, output_size),
-            nn.ReLU(),
+            # nn.ReLU(),
         )
 
     def forward(self, x):
@@ -624,6 +624,9 @@ class AutoRegressorBranchNet(pl.LightningModule):
         self.waypoints_branch = nn.ModuleList(
             [AutoRegressor(hparams, self.layer_size) for i in range(4)]
         )
+        self.speed_branch = nn.ModuleList(
+            [MLP(self.layer_size, 1, 0) for i in range(4)]
+        )
 
     def forward(self, x, command):
         waypoints = torch.cat(
@@ -634,13 +637,12 @@ class AutoRegressorBranchNet(pl.LightningModule):
         )
 
         # Speed prediction
-        # speed = torch.cat(
-        #     [
-        #         self.speed_branch[i - 1](x_in)
-        #         for x_in, i in zip(x, command.to(torch.int))
-        #     ]
-        # )
-        speed = 0
+        speed = torch.cat(
+            [
+                self.speed_branch[i - 1](x_in)
+                for x_in, i in zip(x, command.to(torch.int))
+            ]
+        )
         return waypoints, speed
 
 
@@ -832,7 +834,7 @@ class CIRLBasePolicyAuxKarnet(pl.LightningModule):
             )
         else:
             self.combine_conv = nn.Sequential(
-                nn.Conv1d(4, 1, kernel_size=(4, 1), stride=1), nn.ReLU()
+                nn.Conv1d(4, 1, kernel_size=1, stride=1), nn.ReLU()
             )
 
         # Future latent vector prediction and aux net
@@ -853,8 +855,8 @@ class CIRLBasePolicyAuxKarnet(pl.LightningModule):
 
         # Future latent vector prediction
         self.karnet.eval()
-        reconstructed, out_ae, embeddings, out = self.karnet(x, kalman)
-        embeddings = embeddings.view(batch_size, self.time_steps, -1)
+        reconstructed, out_ae, karnet_embeddings, out = self.karnet(x, kalman)
+        karnet_embeddings = karnet_embeddings.view(batch_size, self.time_steps, -1)
         out = out.view(batch_size, self.time_steps, -1)
 
         self.auxnet.eval()
@@ -866,7 +868,7 @@ class CIRLBasePolicyAuxKarnet(pl.LightningModule):
         base_x = self.back_bone_net(x[:, -1, :, :, :])
 
         combined_embeddings = torch.stack(
-            (embedding, base_x, embeddings[:, -1, :], out[:, -1, :]), dim=1
+            (embedding, base_x, karnet_embeddings[:, -1, :], out[:, -1, :]), dim=1
         )
         combined_embeddings = self.combine_conv(combined_embeddings).squeeze(1)
 

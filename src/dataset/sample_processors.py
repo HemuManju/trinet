@@ -143,3 +143,39 @@ def one_image_samples(samples, config):
     output_seq = images[0, :, :, :]
 
     return input_seq, output_seq
+
+
+def test_samples(samples, config):
+    combined_data = {
+        k: [d.get(k) for d in samples if k in d] for k in set().union(*samples)
+    }
+
+    images = torch.stack(combined_data['jpeg'], dim=0)
+    preproc = get_preprocessing_pipeline(config)
+    images = preproc(images)
+    kalman_updates = []
+
+    # Crop the image
+    if config['crop']:
+        crop_size = config['image_resize'][1] - config['crop_image_resize'][1]
+        images = images[:, :, :crop_size, :]
+
+    last_data = samples[-1]['json']
+
+    if last_data['modified_direction'] in [-1, 5, 6]:
+        command = 4
+    else:
+        command = last_data['modified_direction']
+
+    # Post processing according to the ID
+    images = images[0:-1, :, :, :]
+
+    # Kalman update
+    for data in combined_data['json'][:-1]:
+        updates = config['ekf'].update(data)
+        kalman_updates.append(transforms.ToTensor()(updates))
+
+    # Location
+    location = samples[-1]['json']['location']
+
+    return images, command, torch.stack(kalman_updates), location
