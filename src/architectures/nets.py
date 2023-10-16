@@ -250,20 +250,29 @@ class CNNAutoEncoder(pl.LightningModule):
 
 
 class MLP(pl.LightningModule):
-    def __init__(self, layer_size, output_size, dropout):
+    def __init__(self, layer_size, output_size, dropout, speed=False):
         super(MLP, self).__init__()
         self.output_size = output_size
         self.layer_size = layer_size
         self.dropout = dropout
 
-        self.mlp = nn.Sequential(
-            nn.LazyLinear(self.layer_size),
-            nn.ReLU(),
-            nn.Linear(self.layer_size, self.layer_size // 2),
-            nn.ReLU(),
-            nn.Linear(self.layer_size // 2, output_size),
-            # nn.ReLU(),
-        )
+        if speed:
+            self.mlp = nn.Sequential(
+                nn.LazyLinear(self.layer_size),
+                nn.ReLU(),
+                nn.Linear(self.layer_size, self.layer_size // 2),
+                nn.ReLU(),
+                nn.Linear(self.layer_size // 2, output_size),
+                nn.ReLU(),
+            )
+        else:
+            self.mlp = nn.Sequential(
+                nn.LazyLinear(self.layer_size),
+                nn.ReLU(),
+                nn.Linear(self.layer_size, self.layer_size // 2),
+                nn.ReLU(),
+                nn.Linear(self.layer_size // 2, output_size),
+            )
 
     def forward(self, x):
         out = self.mlp(x)

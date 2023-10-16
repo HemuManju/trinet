@@ -1,4 +1,5 @@
 from collections import deque
+import time
 
 import numpy as np
 from PIL import Image
@@ -53,7 +54,6 @@ class PIThetaNeaFarAgent(BaseAgent):
         self.pi_control = PIController()
 
     def post_process_action(self, acc, steer, brake, speed):
-
         # This a bit biased, but is to avoid fake breaking
         if brake < 0.1:
             brake = 0.0
@@ -128,7 +128,6 @@ class CILAgent(BaseAgent):
         self.time_since_brake = 0
 
     def post_process_action(self, acc, steer, brake, speed):
-
         # This a bit biased, but is to avoid fake breaking
         if brake < 0.1:
             brake = 0.0
@@ -202,7 +201,6 @@ class SteerAccCILAgent(BaseAgent):
         self.max_steering = 0.8
 
     def post_process_action(self, acceleration, steering):
-
         control = carla.VehicleControl()
         if acceleration >= 0.0:
             control.throttle = min(acceleration, self.max_throttle)
@@ -325,7 +323,9 @@ class PIDCILAgent(BaseAgent):
             speed = 10.0
 
         control = self.pid_controller.run_step(
-            target_speed=10.0, waypoint=self.current_waypoint, observation=observation,
+            target_speed=10.0,
+            waypoint=self.current_waypoint,
+            observation=observation,
         )
 
         return control
@@ -368,7 +368,7 @@ class PIDKalmanAgent(PIDCILAgent):
         # Get the control
         output = self._control_function(images.unsqueeze(0), command, kalman)
         try:
-            waypoints, speed = output[0][0].cpu().numpy(), output[1].cpu().numpy()
+            waypoints, speed = output[0][0].cpu().numpy(), output[1][0].cpu().numpy()
         except AttributeError:
             waypoints = output[0][0].cpu().numpy()
 
@@ -383,11 +383,16 @@ class PIDKalmanAgent(PIDCILAgent):
         if dist < 0.85:
             self.current_waypoint = world_frame_waypoints[1, :]
 
-        if command == 3:
+        if not self.config['INCLUDE_SPEED']:
             speed = 10.0
 
+        # Maintain to good speed
+        speed = max(speed, 10.0)
+
         control = self.pid_controller.run_step(
-            target_speed=10.0, waypoint=self.current_waypoint, observation=observation,
+            target_speed=speed,
+            waypoint=self.current_waypoint,
+            observation=observation,
         )
 
         return control

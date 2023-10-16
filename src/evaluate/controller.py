@@ -24,7 +24,10 @@ def find_distance(waypoint, location):
 
 class PIController:
     def __init__(
-        self, max_throttle=0.50, max_brake=0.3, max_steering=0.8,
+        self,
+        max_throttle=0.50,
+        max_brake=0.3,
+        max_steering=0.8,
     ):
         self._dt = 1.0 / 20.0
         self.controller_params = {

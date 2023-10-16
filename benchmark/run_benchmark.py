@@ -193,7 +193,7 @@ class Benchmarking:
             file.close()
 
             # Run the simulations
-            for i in range(len(experiment_config['vehicle']['path_points'])):
+            for i in range(experiment_config['repeat']):
                 self.run_single_episode(exp_id, iteration=i, config=experiment_config)
 
                 # Destroy actors and sensors

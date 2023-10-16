@@ -6,8 +6,8 @@ LEARNING_RATE: 0.0001
 DROP_OUT: 0.10
 TEST_SIZE: 0.15
 VALID_SIZE: 0.15
-NORMALIZE_WEIGHT: False
-INCLUDE_SPEED: True
+NORMALIZE_WEIGHT: True
+INCLUDE_SPEED: False
 
 ##-----------------------------------------------------#
 # Data Parameters
@@ -45,7 +45,7 @@ action_processing_id: 6 # 1, 2, 3, 4, 5, 6
 use_scheduler: True
 normalize_kalman: True
 clip_kalman: True
-max_position: 400
+max_position: 400 # 400
 max_velocity: 20
 
 ##-----------------------------------------------------#
@@ -76,7 +76,7 @@ data_split:
 
 ##-----------------------------------------------------#
 # Path(s)
-slurm: False
+slurm: True
 raw_data_path_local: '/home/hemanth/Desktop/carla-data/Town01_NAVIGATION/'
 raw_data_path_slurm: '../carla-data/Town01_NAVIGATION/'
 # raw_data_path: '/Users/hemanth/Desktop/carla_data/'
