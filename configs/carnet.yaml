@@ -15,7 +15,7 @@ predict_length: 0
 n_actions: 3
 n_classes: 23
 frame_skip: 4
-number_workers: 8
+number_workers: 1
 
 ##-----------------------------------------------------#
 # Base Policy parameters

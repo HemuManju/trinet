@@ -330,4 +330,3 @@ class BasicExperiment(object):
     def get_done_status(self, observation, core):
         """Returns whether or not the experiment has to end"""
         return NotImplementedError
-

@@ -27,7 +27,10 @@ except ModuleNotFoundError:
 
 def read_txt_files(read_path):
     values = pd.read_csv(
-        read_path, sep=" ", header=None, index_col=False,
+        read_path,
+        sep=" ",
+        header=None,
+        index_col=False,
     ).values.tolist()
     return values
 
@@ -50,7 +53,7 @@ class CORL2017(BasicExperiment):
         ).values.tolist()
         path_points = []
         for i in range(0, len(data), 2):
-            path_points.append([data[i], data[i + 1]])
+            path_points.append([data[i], data[i + 1], i])
 
         base_config['vehicle']['path_points'] = path_points
         base_config['town'] = town
@@ -91,7 +94,8 @@ class CORL2017(BasicExperiment):
 
         # Set the planner
         self.route_planner = PathPlanner(
-            self.hero, target_speed=self.cfg['vehicle']['target_speed'],
+            self.hero,
+            target_speed=self.cfg['vehicle']['target_speed'],
         )
         self.route_planner.set_destination(self.end_point.location)
         return None
@@ -237,7 +241,7 @@ class CORL2017(BasicExperiment):
     def get_speed(self, hero):
         """Computes the speed of the hero vehicle in Km/h"""
         vel = hero.get_velocity()
-        return 3.6 * math.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2)
+        return 3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)
 
     def get_done_status(self, observation, core):
         """Returns whether or not the experiment has to end"""

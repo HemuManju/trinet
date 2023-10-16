@@ -1,20 +1,20 @@
 ##------------------Experiment config------------------##
 weathers: [
     # 'ClearNoon',
-    'SoftRainNoon',
+    'MidRainyNoon',
     # 'HardRainNoon',
-    'ClearSunset',
+    # 'ClearSunset',
   ]
 # 'SoftRainSunset',
 # 'HardRainSunset',
-towns: ['Town01']
+towns: ['Town02']
 navigation_types: ['navigation'] # 'straight',, 'navigation', 'one_curve'
 background_activity:
-  n_vehicles: 20
+  n_vehicles: 10
   n_walkers: 10
   tm_hybrid_mode: True
   seed: 1337
-repeat: 1
+repeat: 20
 
 others:
   max_time_idle: 500
@@ -31,8 +31,8 @@ beta: 0.1
 seq_length: 3
 normalize_kalman: True
 clip_kalman: True
-max_position: 400
-max_velocity: 1
+max_position: 330
+max_velocity: 20
 
 ##------------------Vehicle config------------------##
 vehicle:

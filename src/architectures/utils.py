@@ -102,7 +102,7 @@ def convtransp_kernel_shape(
 def get_model(config) -> nn.Module:
     """Get model from layer config dictionary."""
     modules = []
-    for l in config:
+    for l in deepcopy(config):
         layer_type = l.pop("type")
         layer = getattr(torch.nn, layer_type)(**l)
         modules.append(layer)

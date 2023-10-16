@@ -245,20 +245,29 @@ class CNNAutoEncoder(pl.LightningModule):
 
 
 class MLP(pl.LightningModule):
-    def __init__(self, layer_size, output_size, dropout):
+    def __init__(self, layer_size, output_size, dropout, speed=False):
         super(MLP, self).__init__()
         self.output_size = output_size
         self.layer_size = layer_size
         self.dropout = dropout
 
-        self.mlp = nn.Sequential(
-            nn.LazyLinear(self.layer_size),
-            nn.ReLU(),
-            nn.Linear(self.layer_size, self.layer_size // 2),
-            nn.ReLU(),
-            nn.Linear(self.layer_size // 2, output_size),
-            # nn.ReLU(),
-        )
+        if speed:
+            self.mlp = nn.Sequential(
+                nn.LazyLinear(self.layer_size),
+                nn.ReLU(),
+                nn.Linear(self.layer_size, self.layer_size // 2),
+                nn.ReLU(),
+                nn.Linear(self.layer_size // 2, output_size),
+                nn.ReLU(),
+            )
+        else:
+            self.mlp = nn.Sequential(
+                nn.LazyLinear(self.layer_size),
+                nn.ReLU(),
+                nn.Linear(self.layer_size, self.layer_size // 2),
+                nn.ReLU(),
+                nn.Linear(self.layer_size // 2, output_size),
+            )
 
     def forward(self, x):
         out = self.mlp(x)
@@ -619,7 +628,7 @@ class AutoRegressorBranchNet(pl.LightningModule):
             [AutoRegressor(hparams, self.layer_size) for i in range(4)]
         )
         self.speed_branch = nn.ModuleList(
-            [MLP(self.layer_size, 1, 0) for i in range(4)]
+            [MLP(self.layer_size, 1, 0, speed=True) for i in range(4)]
         )
 
     def forward(self, x, command):

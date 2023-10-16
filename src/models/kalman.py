@@ -16,7 +16,6 @@ from .rotations import Quaternion, omega, skew_symmetric, angle_normalize
 
 class ExtendedKalmanFilter:
     def __init__(self, cfg, town='Town01'):
-
         self.config = cfg
 
         # State (position, velocity and orientation)
@@ -106,12 +105,12 @@ class ExtendedKalmanFilter:
 
     def gnss_to_xyz(self, latitude, longitude, altitude):
         """Creates Location from GPS (latitude, longitude, altitude).
-            This is the inverse of the _location_to_gps method found in
-            https://github.com/carla-simulator/scenario_runner/blob/master/srunner/tools/route_manipulation.py
+        This is the inverse of the _location_to_gps method found in
+        https://github.com/carla-simulator/scenario_runner/blob/master/srunner/tools/route_manipulation.py
 
-            Modified from:
-            https://github.com/erdos-project/pylot/blob/master/pylot/utils.py
-            """
+        Modified from:
+        https://github.com/erdos-project/pylot/blob/master/pylot/utils.py
+        """
         EARTH_RADIUS_EQUA = 6378137.0
 
         scale = math.cos(self.gnss_lat_ref * math.pi / 180.0)
@@ -141,7 +140,7 @@ class ExtendedKalmanFilter:
         :return: tuple with lat and lon coordinates
         https://github.com/carla-simulator/scenario_runner/blob/master/srunner/tools/route_manipulation.py
         """
-        xodr_path = f'data/Town01.xodr'
+        xodr_path = f'data/{town}.xodr'
         tree = ET.parse(xodr_path)
 
         # default reference
@@ -312,7 +311,6 @@ class ExtendedKalmanFilter:
         self.p_cov = (np.identity(9) - K @ self.h_jac) @ self.p_cov
 
     def extract_states(self):
-
         if self.config['clip_kalman']:
             position = np.clip(self.p[0:2], a_min=-1, a_max=400)
             velocity = np.clip(self.v[0:2], a_min=-20, a_max=20)
@@ -408,4 +406,3 @@ class ExtendedKalmanFilter:
         )
 
         return updates
-

@@ -24,7 +24,10 @@ def find_distance(waypoint, location):
 
 class PIController:
     def __init__(
-        self, max_throttle=0.50, max_brake=0.3, max_steering=0.8,
+        self,
+        max_throttle=0.50,
+        max_brake=0.3,
+        max_steering=0.8,
     ):
         self._dt = 1.0 / 20.0
         self.controller_params = {
@@ -146,7 +149,7 @@ class VehiclePIDController:
             control.brake = min(abs(acceleration), self.max_brake)
 
         # Steering regulation: changes cannot happen abruptly, can't steer too much.
-        diff = 0.1
+        diff = 0.15
         if current_steering > self.past_steering + diff:
             current_steering = self.past_steering + diff
         elif current_steering < self.past_steering - diff:

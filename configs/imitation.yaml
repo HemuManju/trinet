@@ -7,7 +7,7 @@ DROP_OUT: 0.10
 TEST_SIZE: 0.15
 VALID_SIZE: 0.15
 NORMALIZE_WEIGHT: True
-INCLUDE_SPEED: True
+INCLUDE_SPEED: False
 
 ##-----------------------------------------------------#
 # Data Parameters

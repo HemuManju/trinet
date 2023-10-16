@@ -215,7 +215,7 @@ class KalmanRNNEncoder(RNNEncoder):
         batch_size, timesteps, C, H, W = y.size()
 
         # Predict and calculate loss
-        output, out_ae, rnn_embeddings = self.forward(x, kalman)
+        output, out_ae, rnn_embeddings, out = self.forward(x, kalman)
         criterion = MultiScaleSSIMLoss(kernel_size=11)
         loss = criterion(
             output.reshape(batch_size * timesteps, C, H, W),
@@ -230,7 +230,7 @@ class KalmanRNNEncoder(RNNEncoder):
         batch_size, timesteps, C, H, W = y.size()
 
         # Predict and calculate loss
-        output, out_ae, rnn_embeddings = self.forward(x, kalman)
+        output, out_ae, rnn_embeddings, out = self.forward(x, kalman)
         criterion = MultiScaleSSIMLoss(kernel_size=11)
         loss = criterion(
             output.reshape(batch_size * timesteps, C, H, W),
