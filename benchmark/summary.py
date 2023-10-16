@@ -53,7 +53,7 @@ def consolidate_results(df):
     return results
 
 
-def summarize(read_path):
+def summarize(read_path, num_runs=10):
     df = pd.read_csv(read_path, index_col=0, skipfooter=1)
 
     new_labels = ['iteration', 'exp_id', 'navigation_type']
@@ -65,11 +65,14 @@ def summarize(read_path):
         df_temp = df.loc[index]
         results.append(consolidate_results(df_temp))
 
-    final_summary = (
-        pd.DataFrame.from_dict(results, orient='columns')
-        .sort_values('route_completed', ascending=False)
-        .head(15)
+    final_summary = pd.DataFrame.from_dict(results, orient='columns').sort_values(
+        'route_completed', ascending=False
     )
+
+    # Drop the circular case
+    final_summary = final_summary.drop(
+        final_summary[final_summary.n_lane_invasion > 75].index
+    ).head(num_runs)
     print(final_summary)
 
     # Drop stalled episodes and clean up some

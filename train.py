@@ -289,7 +289,7 @@ with skip_run('skip', 'imitation_with_aux_base_policy_attn') as check, check():
 
     trainer.fit(model)
 
-with skip_run('run', 'imitation_with_aux_semseg_base_policy_conv') as check, check():
+with skip_run('skip', 'imitation_with_aux_semseg_base_policy_conv') as check, check():
     # Load the configuration
     cfg = yaml.load(open('configs/imitation.yaml'), Loader=yaml.SafeLoader)
     cfg['logs_path'] = cfg['logs_path'] + str(date.today()) + '/IMITATION_AUX_BASE'
@@ -375,8 +375,7 @@ with skip_run('skip', 'benchmark_trained_aux_base') as check, check():
 
     # Experiment_config and experiment suite
     experiment_cfg = yaml.load(open('configs/experiments.yaml'), Loader=yaml.SafeLoader)
-    cfg = yaml.load(open('configs/auxnet.yaml'), Loader=yaml.SafeLoader)
-    ekf = ExtendedKalmanFilter(cfg)
+    ekf = ExtendedKalmanFilter(cfg, town=experiment_cfg['towns'][0])
     experiment_suite = CORL2017(experiment_cfg, ekf)
 
     # Carla server
@@ -384,6 +383,32 @@ with skip_run('skip', 'benchmark_trained_aux_base') as check, check():
     kill_all_servers()
     os.environ["CARLA_ROOT"] = cfg['carla_server']['carla_path']
     core = CarlaCore(cfg['carla_server'])
+
+    model_date = '2023-09-24'
+
+    if model_date == '2023-09-21':
+        cfg['NORMALIZE_WEIGHT'] = False
+        cfg['INCLUDE_SPEED'] = True
+    elif model_date == '2023-09-22':
+        cfg['NORMALIZE_WEIGHT'] = True
+        cfg['INCLUDE_SPEED'] = True
+    elif model_date == '2023-09-23':
+        cfg['NORMALIZE_WEIGHT'] = True
+        cfg['INCLUDE_SPEED'] = False
+    elif model_date == '2023-09-24':
+        cfg['NORMALIZE_WEIGHT'] = False
+        cfg['INCLUDE_SPEED'] = False
+
+    # Other parameters
+    if cfg['NORMALIZE_WEIGHT']:
+        constrained_type = 'constrained'
+    else:
+        constrained_type = 'unconstrained'
+
+    if cfg['INCLUDE_SPEED']:
+        speed_included = 'with_speed'
+    else:
+        speed_included = 'without_speed'
 
     # Get all the experiment configs
     all_experiment_configs = experiment_suite.get_experiment_configs()
@@ -395,8 +420,10 @@ with skip_run('skip', 'benchmark_trained_aux_base') as check, check():
         config['summary_writer']['directory'] = f'{town}_{navigation_type}_{weather}'
         config['summary_writer'][
             'write_path'
-        ] = f'logs/benchmark/unconstrained_{datetime.now().strftime("%d_%m_%Y_%H_%M_%S")}'
-        config['summary_writer']['message'] = 'base + aux unconstrained convolution'
+        ] = f'logs/benchmark/{constrained_type}_{speed_included}_{datetime.now().strftime("%d_%m_%Y_%H_%M_%S")}'
+        config['summary_writer'][
+            'message'
+        ] = f'base + aux {constrained_type} convolution + {speed_included}'
 
         auxnet = SemanticAuxNet(cfg)
         cfg['auxnet'] = auxnet
@@ -410,7 +437,7 @@ with skip_run('skip', 'benchmark_trained_aux_base') as check, check():
         cfg['base_policy'] = base_policy
 
         restore_config = {
-            'checkpoint_path': f'logs/2023-09-10/IMITATION_AUX_BASE/last.ckpt'
+            'checkpoint_path': f'logs/{model_date}/IMITATION_AUX_BASE/last.ckpt'
         }
 
         model = Imitation.load_from_checkpoint(
@@ -429,7 +456,7 @@ with skip_run('skip', 'benchmark_trained_aux_base') as check, check():
         benchmark.run(config, exp_id)
 
     # Kill all servers
-    kill_all_servers()(model, cfg)
+    kill_all_servers()
 
 with skip_run('skip', 'benchmark_trained_carnet_model') as check, check():
     # Load the configuration
@@ -490,23 +517,27 @@ with skip_run('skip', 'summarize_benchmark') as check, check():
     # Load the configuration
     cfg = yaml.load(open('configs/imitation.yaml'), Loader=yaml.SafeLoader)
     cfg['logs_path'] = cfg['logs_path'] + str(date.today()) + '/WARMSTART'
-    benchmark_dir = 'logs/benchmark/unconstrained_13_09_2023_15_32_29'
+    # benchmark_dir = 'logs/benchmark/constrained_without_speed_04_10_2023_22_32_26'
+    benchmark_dir = 'logs/benchmark/unconstrained_without_speed_15_10_2023_19_55_39'
 
     # towns = ['Town02', 'Town01']
     # weathers = ['ClearSunset', 'SoftRainNoon']
     # navigation_types = ['straight', 'one_curve', 'navigation']
 
-    towns = ['Town01']
-    weathers = ['SoftRainNoon']  #'ClearSunset',
+    towns = ['Town02']
+    weathers = ['MidRainyNoon']  #'ClearSunset',
     navigation_types = ['navigation']
 
-    for town, weather, navigation_type in itertools.product(
-        towns, weathers, navigation_types
-    ):
-        path = f'{benchmark_dir}/{town}_{navigation_type}_{weather}/measurements.csv'
-        print('-' * 32)
-        print(town, weather, navigation_type)
-        summarize(path)
+    for i in range(5, 20):
+        for town, weather, navigation_type in itertools.product(
+            towns, weathers, navigation_types
+        ):
+            path = (
+                f'{benchmark_dir}/{town}_{navigation_type}_{weather}/measurements.csv'
+            )
+            print('-' * 32)
+            print(town, weather, navigation_type)
+            summarize(path, num_runs=i)
 
 with skip_run('skip', 'benchmark_trained_model') as check, check():
     # Load the configuration
