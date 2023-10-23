@@ -886,7 +886,7 @@ class CIRLBasePolicyAuxKarnet(pl.LightningModule):
 
         # Action prediction
         waypoints, speed = self.action_net(out, command)
-        return waypoints, speed
+        return waypoints
 
 
 class AuxNet(pl.LightningModule):

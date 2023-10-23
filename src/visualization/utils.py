@@ -7,7 +7,6 @@ import torchvision.transforms.functional as F
 
 
 def show_grid(imgs):
-
     # if not isinstance(imgs, list):
     #     imgs = [imgs]
     fig, axs = plt.subplots(ncols=len(imgs), squeeze=False)
@@ -55,3 +54,11 @@ def plot_frames(ax, array):
         plt.pause(0.01)
     except KeyboardInterrupt:
         print("\nshutdown by user")
+
+
+def change_spine_asthetics(ax):
+    for spine in ['right', 'top']:
+        ax.spines[spine].set_visible(True)
+        ax.spines[spine].set_linewidth(0.5)
+        ax.spines[spine].set_color('#BABABA')
+    return None

@@ -49,6 +49,8 @@ from src.dataset.utils import (
     resample_waypoints,
 )
 
+from src.visualization.utils import change_spine_asthetics
+
 from benchmark.run_benchmark import Benchmarking
 from benchmark.summary import summarize
 
@@ -428,7 +430,7 @@ with skip_run('skip', 'benchmark_trained_aux_karnet_base') as check, check():
     os.environ["CARLA_ROOT"] = cfg['carla_server']['carla_path']
     core = CarlaCore(cfg['carla_server'])
 
-    model_date = '2023-10-11'
+    model_date = '2023-10-16'
 
     if model_date == '2023-09-21':
         cfg['NORMALIZE_WEIGHT'] = False
@@ -439,7 +441,7 @@ with skip_run('skip', 'benchmark_trained_aux_karnet_base') as check, check():
     elif model_date == '2023-10-11':
         cfg['NORMALIZE_WEIGHT'] = True
         cfg['INCLUDE_SPEED'] = False
-    elif model_date == '2023-09-24':
+    elif model_date == '2023-10-16':
         cfg['NORMALIZE_WEIGHT'] = False
         cfg['INCLUDE_SPEED'] = False
 
@@ -570,15 +572,15 @@ with skip_run('skip', 'summarize_benchmark') as check, check():
     # Load the configuration
     cfg = yaml.load(open('configs/imitation.yaml'), Loader=yaml.SafeLoader)
     cfg['logs_path'] = cfg['logs_path'] + str(date.today()) + '/WARMSTART'
-    # benchmark_dir = 'logs/benchmark/constrained_without_speed_15_10_2023_20_20_59'
-    benchmark_dir = 'logs/benchmark/unconstrained_without_speed_11_10_2023_20_49_51'
+    benchmark_dir = 'logs/benchmark/constrained_without_speed_15_10_2023_20_20_59'
+    # benchmark_dir = 'logs/benchmark/unconstrained_without_speed_16_10_2023_19_05_49'
 
     # towns = ['Town02', 'Town01']
     # weathers = ['ClearSunset', 'SoftRainNoon']
     # navigation_types = ['straight', 'one_curve', 'navigation']
 
     towns = ['Town02']
-    weathers = ['SoftRainNoon']  #'MidRainyNoon',
+    weathers = ['MidRainyNoon']  #'MidRainyNoon',
     navigation_types = ['navigation']
 
     for i in range(5, 20):
@@ -633,6 +635,21 @@ with skip_run('skip', 'ablation_study') as check, check():
     gpus = get_num_gpus()
     torch.manual_seed(cfg['pytorch_seed'])
 
+    model_date = '2023-10-16'
+
+    if model_date == '2023-09-21':
+        cfg['NORMALIZE_WEIGHT'] = False
+        cfg['INCLUDE_SPEED'] = True
+    elif model_date == '2023-09-22':
+        cfg['NORMALIZE_WEIGHT'] = True
+        cfg['INCLUDE_SPEED'] = True
+    elif model_date == '2023-10-11':
+        cfg['NORMALIZE_WEIGHT'] = True
+        cfg['INCLUDE_SPEED'] = False
+    elif model_date == '2023-10-16':
+        cfg['NORMALIZE_WEIGHT'] = False
+        cfg['INCLUDE_SPEED'] = False
+
     # Setup the network
     # Load the karnet
     read_path = 'logs/2023-01-03/CARNET_KALMAN/last.ckpt'
@@ -662,7 +679,7 @@ with skip_run('skip', 'ablation_study') as check, check():
     net(net.example_input_array, net.example_command, net.example_kalman)
 
     restore_config = {
-        'checkpoint_path': f'logs/2023-08-28/IMITATION_AUX_KARNET_BASE/last.ckpt'
+        'checkpoint_path': f'logs/{model_date}/IMITATION_AUX_KARNET_BASE/last.ckpt'
     }
     model = Imitation.load_from_checkpoint(
         restore_config['checkpoint_path'],
@@ -685,7 +702,7 @@ with skip_run('skip', 'ablation_study') as check, check():
 
     longterm_pred = []
     location = []
-    t = 500
+    t = 800
 
     for images, command, kalman, loc in data_loader:
         attr = ablator.attribute(
@@ -717,38 +734,74 @@ with skip_run('skip', 'ablation_study') as check, check():
     # Plotting
     import matplotlib.pyplot as plt
 
-    plt.style.use('clean')
-    fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True)
-    label = {
-        0: r'$δ_{t}$',
-        1: r'$α_{t}$',
-        2: r'$ℓ_{t}$',
-        3: r'$ℓ_{t+1}$',
-    }
-    i = 0
-    for i in range(shorterm_pred.shape[0]):
-        if i == 1:
-            t = offset_points(new_location, distance=3)
-        elif i == 2:
-            t = offset_points(new_location, distance=-3)
-        elif i == 3:
-            t = offset_points(new_location, distance=6)
-        else:
-            t = new_location
-        axs[0].scatter(
-            t[:, 0], t[:, 1], s=shorterm_pred[i, 0 : len(t)] * 50, label=label[i]
+    xylim = [[[-10, 15], [-20, 10]], [[70, 100], [-20, 10]], [[20, 50], [-5, 15]]]
+    range_lims = [[572, 607], [489, 525], [617, 643]]
+
+    for (xlim, ylim), range_lim in zip(xylim, range_lims):
+        print('+-' * 32)
+        plt.style.use('clean')
+        fig, axs = plt.subplots(
+            ncols=2, sharex=True, sharey=True, constrained_layout=True, figsize=(6, 3)
         )
-        axs[1].scatter(
-            t[:, 0], t[:, 1], s=longterm_pred[i, 0 : len(t)] * 50, label=label[i]
-        )
+        label = {
+            0: r'$δ_{t}$',
+            1: r'$η_{t}$',
+            2: r'$ℓ_{t}$',
+            3: r'$ℓ_{t+1}$',
+        }
+        color = {0: '#4e79a7', 1: '#f28e2c', 2: '#e15659', 3: '#76b7b2'}
+        i = 0
+        for i in range(4):
+            if i == 1:
+                t = offset_points(new_location, distance=3)
+            elif i == 2:
+                t = offset_points(new_location, distance=-3)
+            elif i == 3:
+                t = offset_points(new_location, distance=6)
+            else:
+                t = new_location
 
-    axs[0].set_title('Near Waypoint Prediction')
-    axs[1].set_title('Far Waypoint Prediction')
+            # Rotate points
+            t = np.rot90(t, k=3)
 
-    axs[0].grid()
-    axs[1].grid()
+            print(
+                f'Short term {label[i]} = {np.mean(shorterm_pred[i, range_lim[0]: range_lim[1]])}'
+            )
+            print(
+                f'Long term {label[i]} = {np.mean(longterm_pred[i, range_lim[0]: range_lim[1]])}'
+            )
+            print('-' * 32)
 
-    plt.autoscale(enable=True)
-    plt.rcParams['axes.grid'] = True
-    plt.legend()
-    plt.show()
+            axs[0].scatter(
+                t[0, :],
+                -t[1, :],
+                s=shorterm_pred[i, 0 : t.shape[1]] * 50,
+                label=label[i],
+                c=color[i],
+            )
+            axs[1].scatter(
+                t[0, :],
+                -t[1, :],
+                s=longterm_pred[i, 0 : t.shape[1]] * 50,
+                label=label[i],
+                c=color[i],
+            )
+
+        axs[0].set_title('Near Waypoint Prediction')
+        axs[1].set_title('Far Waypoint Prediction')
+        axs[0].set_ylabel('y (m)')
+
+        for ax in axs:
+            change_spine_asthetics(ax)
+            ax.set_xlabel('x (m)')
+            ax.grid()
+            ax.set_ylim(ylim)
+            ax.set_xlim(xlim)
+
+        # for i, txt in enumerate(t):
+        #     ax.annotate(i, (t[i, 0], t[i, 1]))
+
+        plt.autoscale(enable=True)
+        plt.rcParams['axes.grid'] = True
+        plt.legend()
+        plt.show()
